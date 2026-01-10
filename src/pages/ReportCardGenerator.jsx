@@ -22,26 +22,35 @@ const classStudents = [
 
 const ReportCardGenerator = () => {
     const [classes, setClasses] = useState([]);
+    const [periods, setPeriods] = useState([]);
     const [selectedClass, setSelectedClass] = useState('');
-    const [selectedPeriod, setSelectedPeriod] = useState('T1');
+    const [selectedPeriod, setSelectedPeriod] = useState('');
     const [students, setStudents] = useState([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
     const [downloadingBulk, setDownloadingBulk] = useState(false);
 
-    // Fetch classes
+    // Fetch classes and periods
     useEffect(() => {
-        const fetchClasses = async () => {
+        const init = async () => {
             try {
-                const res = await api.get('/classes/');
-                setClasses(res.data);
-                if (res.data.length > 0) setSelectedClass(res.data[0].id);
+                const [classRes, periodRes] = await Promise.all([
+                    api.get('/classes'),
+                    api.get('/periods')
+                ]);
+
+                setClasses(classRes.data);
+                if (classRes.data.length > 0) setSelectedClass(classRes.data[0].id);
+
+                setPeriods(periodRes.data);
+                if (periodRes.data.length > 0) setSelectedPeriod(periodRes.data[0].id);
+
             } catch (err) {
                 console.error(err);
-                toast.error("Erreur chargement classes");
+                toast.error("Erreur chargement données init");
             }
         };
-        fetchClasses();
+        init();
     }, []);
 
     // Fetch students when filters change
@@ -51,21 +60,14 @@ const ReportCardGenerator = () => {
             setLoading(true);
             try {
                 // Fetch students for the class
-                const response = await api.get(`/students/?class_id=${selectedClass}`);
+                const response = await api.get(`/students?class_id=${selectedClass}`);
 
-                // For demonstration, since calculating ALL averages on the fly can be slow,
-                // we might want a separate "stats" endpoint or just show students and "Ready" if they have grades.
-                // For now, let's map them. We don't have the average readily available in the student list.
-                // We'd need to fetch that or just assume "Ready" for UI demo.
-                // Or: api.get('/bulletins/preview?class_id=...') could be better.
-
-                // Simplified: Just list students. 
                 const mapped = response.data.map(s => ({
                     id: s.id,
                     name: `${s.last_name} ${s.first_name}`,
                     matricule: s.registration_number,
-                    status: 'ready', // Assume ready for now, or check via another call
-                    average: 0, // Placeholder
+                    status: 'ready',
+                    average: '-',
                     rank: '-'
                 }));
                 setStudents(mapped);
@@ -78,48 +80,14 @@ const ReportCardGenerator = () => {
         fetchStudents();
     }, [selectedClass, selectedPeriod]);
 
-    const handleDownloadBulk = async () => {
-        if (!selectedClass) return;
-        setDownloadingBulk(true);
-        try {
-            // Trigger download via window.open or blob
-            // Using api.get with responseType blob
-            const response = await api.get(`/bulletins/download-bulk/${selectedClass}?period_id=${selectedPeriod}`, {
-                responseType: 'blob'
-            });
-
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `bulletins_${selectedClass}.zip`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            toast.success("Téléchargement démarré");
-        } catch (err) {
-            console.error(err);
-            toast.error("Erreur téléchargement");
-        } finally {
-            setDownloadingBulk(false);
+    const handleDownloadIndividual = (studentId) => {
+        if (!selectedPeriod) {
+            toast.error("Veuillez sélectionner une période");
+            return;
         }
-    };
-
-    const handleDownloadIndividual = async (studentId) => {
-        try {
-            const response = await api.get(`/bulletins/download-single/${studentId}?period_id=${selectedPeriod}`, {
-                responseType: 'blob'
-            });
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `bulletin_${studentId}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-        } catch (err) {
-            console.error(err);
-            toast.error("Impossible de télécharger le bulletin (pas de notes ?)");
-        }
+        // Open the bulletin view in a new tab
+        const url = `http://localhost:8000/api/bulletins/${studentId}/${selectedPeriod}`;
+        window.open(url, '_blank');
     };
 
     const containerVariants = {
@@ -163,7 +131,7 @@ const ReportCardGenerator = () => {
                     />
                     <Select
                         label="Période"
-                        options={[{ value: 'T1', label: '1er Trimestre' }, { value: 'T2', label: '2ème Trimestre' }]}
+                        options={periods.map(p => ({ value: p.id, label: p.name }))}
                         value={selectedPeriod}
                         onChange={(e) => setSelectedPeriod(e.target.value)}
                     />

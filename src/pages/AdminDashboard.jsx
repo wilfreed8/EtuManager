@@ -39,8 +39,13 @@ const AdminDashboard = () => {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const response = await api.get('/establishments/stats');
-                setStats(prev => ({ ...prev, ...response.data }));
+                const response = await api.get('/stats');
+                setStats(prev => ({
+                    ...prev,
+                    totalStudents: response.data.students_count,
+                    totalTeachers: response.data.teachers_count,
+                    classesManaged: response.data.classes_count,
+                }));
             } catch (err) {
                 console.error("Error fetching stats:", err);
             } finally {

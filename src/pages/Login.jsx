@@ -28,16 +28,16 @@ const Login = ({ onLogin }) => {
         setLoading(true);
 
         try {
-            // Call backend API
-            const response = await api.post('/auth/login', {
+            // Call backend API (Laravel Sanctum)
+            const response = await api.post('/login', {
                 email: formData.email,
                 password: formData.password
             });
 
-            const user = response.data;
+            const { access_token, user } = response.data;
 
             // Save token
-            localStorage.setItem('token', user.token);
+            localStorage.setItem('token', access_token);
 
             onLogin(user);
 
