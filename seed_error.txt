@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "C:\Users\wilfr\Downloads\Antigravity\seed_root.py", line 20, in <module>
+    from app.core.database import Base, DATABASE_URL
+ImportError: cannot import name 'DATABASE_URL' from 'app.core.database' (C:\Users\wilfr\Downloads\Antigravity\backend\app\core\database.py)
+Inserted C:\Users\wilfr\Downloads\Antigravity\backend to sys.path at index 0
+Sys Path: ['C:\\Users\\wilfr\\Downloads\\Antigravity\\backend', 'C:\\Users\\wilfr\\Downloads\\Antigravity', 'c:\\Users\\wilfr\\Downloads\\Antigravity\\backend', 'C:\\Users\\wilfr\\AppData\\Local\\Python\\pythoncore-3.14-64\\python314.zip', 'C:\\Users\\wilfr\\AppData\\Local\\Python\\pythoncore-3.14-64\\DLLs', 'C:\\Users\\wilfr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib', 'C:\\Users\\wilfr\\AppData\\Local\\Python\\pythoncore-3.14-64', 'C:\\Users\\wilfr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages']
+Importing app.core.database...
+ImportError during setup: cannot import name 'DATABASE_URL' from 'app.core.database' (C:\Users\wilfr\Downloads\Antigravity\backend\app\core\database.py)

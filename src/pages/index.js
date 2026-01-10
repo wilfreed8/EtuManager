@@ -1,0 +1,13 @@
+export { default as Landing } from './Landing';
+export { default as Login } from './Login';
+export { default as AdminDashboard } from './AdminDashboard';
+export { default as TeacherDashboard } from './TeacherDashboard';
+export { default as Onboarding } from './Onboarding';
+export { default as StudentRegistration } from './StudentRegistration';
+export { default as GradeEntry } from './GradeEntry';
+export { default as ReportCardGenerator } from './ReportCardGenerator';
+export { default as SuperAdminDashboard } from './SuperAdminDashboard';
+export { default as UserManagement } from './UserManagement';
+
+
+

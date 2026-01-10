@@ -1,0 +1,13 @@
+import os
+from supabase import create_client, Client
+from dotenv import load_dotenv
+
+load_dotenv()
+
+url: str = os.environ.get("SUPABASE_URL", "https://your-project.supabase.co")
+key: str = os.environ.get("SUPABASE_ANON_KEY", "your-anon-key")
+
+supabase: Client = create_client(url, key)
+
+def get_supabase():
+    return supabase
