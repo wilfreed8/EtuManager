@@ -10,17 +10,7 @@ import { Card, Button, Input, Select, Badge } from '../components/ui';
 import api from '../lib/api';
 import { toast } from 'react-hot-toast';
 
-// Mock data for students in a class with averages
-const classStudents = [
-    { id: 1, name: 'ADJO Koffi', matricule: 'REG-001', average: 14.50, rank: '3e', status: 'ready' },
-    { id: 2, name: 'BELLO Sarah', matricule: 'REG-002', average: 16.75, rank: '1er', status: 'ready' },
-    { id: 3, name: 'DOSSOU Marc', matricule: 'REG-003', average: 11.20, rank: '12e', status: 'pending' },
-    { id: 4, name: 'KEITA Fatou', matricule: 'REG-004', average: 15.10, rank: '2e', status: 'ready' },
-    { id: 5, name: 'LAWSON Paul', matricule: 'REG-005', average: 9.45, rank: '15e', status: 'ready' },
-    { id: 6, name: 'MENSAH Jean', matricule: 'REG-006', average: 12.80, rank: '8e', status: 'ready' },
-];
-
-const ReportCardGenerator = () => {
+const ReportCardGenerator = ({ user }) => {
     const [classes, setClasses] = useState([]);
     const [periods, setPeriods] = useState([]);
     const [selectedClass, setSelectedClass] = useState('');
@@ -33,10 +23,22 @@ const ReportCardGenerator = () => {
     // Fetch classes and periods
     useEffect(() => {
         const init = async () => {
+            if (!user?.establishment_id) return;
             try {
+                const activeYearId = user.establishment?.active_academic_year?.id;
+
                 const [classRes, periodRes] = await Promise.all([
-                    api.get('/classes'),
-                    api.get('/periods')
+                    api.get('/classes', {
+                        params: {
+                            establishment_id: user.establishment_id,
+                            academic_year_id: activeYearId
+                        }
+                    }),
+                    api.get('/periods', {
+                        params: {
+                            academic_year_id: activeYearId
+                        }
+                    })
                 ]);
 
                 setClasses(classRes.data);
@@ -51,7 +53,7 @@ const ReportCardGenerator = () => {
             }
         };
         init();
-    }, []);
+    }, [user]);
 
     // Fetch students when filters change
     useEffect(() => {
@@ -59,7 +61,9 @@ const ReportCardGenerator = () => {
             if (!selectedClass) return;
             setLoading(true);
             try {
-                // Fetch students for the class
+                // Fetch students for the class (backend handles filtering if enrollment exists)
+                // Using class_id on student controller only works if enrollment is correct.
+                // Assuming students enrollments are created.
                 const response = await api.get(`/students?class_id=${selectedClass}`);
 
                 const mapped = response.data.map(s => ({
@@ -67,12 +71,11 @@ const ReportCardGenerator = () => {
                     name: `${s.last_name} ${s.first_name}`,
                     matricule: s.registration_number,
                     status: 'ready',
-                    average: '-',
-                    rank: '-'
                 }));
                 setStudents(mapped);
             } catch (err) {
                 console.error(err);
+                // toast.error("Erreur chargement élèves");
             } finally {
                 setLoading(false);
             }
@@ -80,14 +83,71 @@ const ReportCardGenerator = () => {
         fetchStudents();
     }, [selectedClass, selectedPeriod]);
 
-    const handleDownloadIndividual = (studentId) => {
+    const handleDownloadIndividual = async (studentId) => {
         if (!selectedPeriod) {
             toast.error("Veuillez sélectionner une période");
             return;
         }
-        // Open the bulletin view in a new tab
-        const url = `http://localhost:8000/api/bulletins/${studentId}/${selectedPeriod}`;
-        window.open(url, '_blank');
+
+        try {
+            const toastId = toast.loading("Génération du bulletin...");
+            const response = await api.get(`/bulletins/${studentId}/${selectedPeriod}`, {
+                responseType: 'text' // We expect HTML string
+            });
+
+            toast.dismiss(toastId);
+
+            // Open in new window/tab by writing content
+            // This bypasses auth requirement for the URL itself
+            const win = window.open('', '_blank');
+            if (win) {
+                win.document.write(response.data);
+                win.document.close();
+            } else {
+                toast.error("Pop-up bloqué. Veuillez autoriser les pop-ups.");
+            }
+
+        } catch (error) {
+            console.error(error);
+            toast.dismiss();
+            toast.error("Erreur génération bulletin");
+        }
+    };
+
+    const handleDownloadBulk = async () => {
+        if (!selectedClass || !selectedPeriod) {
+            toast.error("Veuillez sélectionner une classe et une période");
+            return;
+        }
+
+        setDownloadingBulk(true);
+        const toastId = toast.loading("Préparation de l'archive ZIP...");
+
+        try {
+            // We request a ZIP blob directly
+            const response = await api.get(`/bulletins/class/${selectedClass}/period/${selectedPeriod}`, {
+                responseType: 'blob'
+            });
+
+            // Create download link
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            const className = classes.find(c => c.id === selectedClass)?.name || 'Classe';
+            link.setAttribute('download', `Bulletins_${className}.zip`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            toast.dismiss(toastId);
+            toast.success("Téléchargement lancé");
+        } catch (err) {
+            console.error(err);
+            toast.dismiss(toastId);
+            toast.error("Erreur lors du téléchargement");
+        } finally {
+            setDownloadingBulk(false);
+        }
     };
 
     const containerVariants = {
@@ -113,6 +173,7 @@ const ReportCardGenerator = () => {
                         variant="outline"
                         icon={FileDown}
                         loading={downloadingBulk}
+                        disabled={downloadingBulk || students.length === 0}
                         onClick={handleDownloadBulk}
                     >
                         Télécharger Tout (ZIP)
@@ -125,16 +186,22 @@ const ReportCardGenerator = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <Select
                         label="Classe"
-                        options={classes.map(c => ({ value: c.id, label: c.name }))}
                         value={selectedClass}
                         onChange={(e) => setSelectedClass(e.target.value)}
-                    />
+                    >
+                        <option value="">Sélectionner une classe</option>
+                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </Select>
+
                     <Select
                         label="Période"
-                        options={periods.map(p => ({ value: p.id, label: p.name }))}
                         value={selectedPeriod}
                         onChange={(e) => setSelectedPeriod(e.target.value)}
-                    />
+                    >
+                        <option value="">Sélectionner une période</option>
+                        {periods.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </Select>
+
                     <div className="md:col-span-2">
                         <Input
                             label="Rechercher un élève"
@@ -159,28 +226,39 @@ const ReportCardGenerator = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {students.filter(s => s.name.toLowerCase().includes(search.toLowerCase())).map((student) => (
-                                <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <span className="text-sm font-semibold text-gray-900">{student.name}</span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className="text-xs text-gray-400 font-mono">{student.matricule}</span>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex justify-end gap-2">
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                icon={Download}
-                                                onClick={() => handleDownloadIndividual(student.id)}
-                                            >
-                                                Télécharger
-                                            </Button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                            {loading ? (
+                                [...Array(5)].map((_, i) => (
+                                    <tr key={i} className="animate-pulse">
+                                        <td className="px-6 py-4"><div className="h-6 bg-gray-100 rounded w-32"></div></td>
+                                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-24"></div></td>
+                                        <td className="px-6 py-4"><div className="h-8 bg-gray-100 rounded w-24 ml-auto"></div></td>
+                                    </tr>
+                                ))
+                            ) : (
+                                students.filter(s => s.name.toLowerCase().includes(search.toLowerCase())).map((student) => (
+                                    <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <span className="text-sm font-semibold text-gray-900">{student.name}</span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className="text-xs text-gray-400 font-mono">{student.matricule}</span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    icon={Download}
+                                                    onClick={() => handleDownloadIndividual(student.id)}
+                                                    disabled={downloadingBulk}
+                                                >
+                                                    Télécharger
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                             {students.length === 0 && !loading && (
                                 <tr>
                                     <td colSpan="3" className="px-6 py-8 text-center text-gray-500">

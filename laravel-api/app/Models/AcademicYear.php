@@ -26,4 +26,19 @@ class AcademicYear extends Model
     {
         return $this->belongsTo(Establishment::class);
     }
+
+    public function periods()
+    {
+        return $this->hasMany(Period::class);
+    }
+
+    public function enrollments()
+    {
+        return $this->hasMany(StudentEnrollment::class);
+    }
+
+    public function teacherAssignments()
+    {
+        return $this->hasMany(TeacherAssignment::class);
+    }
 }

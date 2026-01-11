@@ -8,6 +8,7 @@ const Select = forwardRef(({
     icon: Icon,
     placeholder = 'Sélectionner...',
     className = '',
+    children,
     ...props
 }, ref) => {
     return (
@@ -38,12 +39,18 @@ const Select = forwardRef(({
           `}
                     {...props}
                 >
-                    <option value="" disabled>{placeholder}</option>
-                    {options.map((option) => (
-                        <option key={option.value} value={option.value}>
-                            {option.label}
-                        </option>
-                    ))}
+                    {children ? (
+                        children
+                    ) : (
+                        <>
+                            <option value="" disabled>{placeholder}</option>
+                            {options.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </>
+                    )}
                 </select>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                     <ChevronDown className="w-5 h-5" />

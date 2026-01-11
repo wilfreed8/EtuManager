@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
     Users,
@@ -6,54 +6,52 @@ import {
     Search,
     Mail,
     Phone,
-    BookOpen,
-    MoreVertical,
     Edit,
     Trash2,
     Shield,
     CheckCircle2,
-    X,
-    Plus
+    MoreVertical
 } from 'lucide-react';
 import { Card, Button, Input, Select, Badge, Modal } from '../components/ui';
 import api from '../lib/api';
-import { useEffect } from 'react';
-
 import { toast } from 'react-hot-toast';
 import AssignmentForm from '../components/AssignmentForm';
 
-// Mock Teachers Data
-const initialTeachers = [
-    { id: '123e4567-e89b-12d3-a456-426614174000', name: 'Dubois Marc', email: 'm.dubois@ecole.tg', phone: '+228 90 12 34 56', status: 'Active', assignments: ['Maths (6ème A)', 'Maths (5ème B)'] },
-    { id: '223e4567-e89b-12d3-a456-426614174001', name: 'Salami Fatou', email: 'f.salami@ecole.tg', phone: '+228 91 23 45 67', status: 'Active', assignments: ['SVT (4ème A)', 'SVT (3ème B)'] },
-    { id: '323e4567-e89b-12d3-a456-426614174002', name: 'Kpodar Jean', email: 'j.kpodar@ecole.tg', phone: '+228 92 34 56 78', status: 'On Leave', assignments: ['Français (6ème C)'] },
-    { id: '423e4567-e89b-12d3-a456-426614174003', name: 'Agbessi Claire', email: 'c.agbessi@ecole.tg', phone: '+228 93 45 67 89', status: 'Active', assignments: ['Physique (1ère D)', 'Maths (Terminal D)'] },
-];
-
-const UserManagement = () => {
+const UserManagement = ({ user }) => {
     const [teachers, setTeachers] = useState([]);
     const [search, setSearch] = useState('');
     const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
     const [selectedTeacher, setSelectedTeacher] = useState(null);
+    const [editingTeacher, setEditingTeacher] = useState(null);
+    const [teacherToDelete, setTeacherToDelete] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Form State
+    const initialFormState = {
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        address: '',
+        password: '' // Only for create
+    };
+    const [formData, setFormData] = useState(initialFormState);
 
     // Fetch Teachers
     const fetchTeachers = async () => {
         try {
             setLoading(true);
-            const response = await api.get('/users?role=ENSEIGNANT');
-            // Transform response to match UI expected format if needed, or update UI to match API
-            // API returns: { id, name, email, role, ... }
-            // UI expects attributes like 'phone', 'status', 'assignments' (which are not in User model yet)
-            // We'll mock the missing ones for now or fetch them.
-            // Teacher assignments are fetched separately or we assume 0 for list view?
-            // For now, simple mapping:
+            // Fetch users with role ENSEIGNANT for the current establishment
+            const response = await api.get(`/users?role=ENSEIGNANT&establishment_id=${user?.establishment_id}`);
             const mapped = response.data.map(u => ({
                 ...u,
-                phone: 'N/A', // Not in User model
+                // If backend doesn't return phone/address yet (migration just ran), handle graceful fallback
                 status: 'Active',
-                assignments: [] // We'd need to fetch these or just show count
+                assignments: u.teacher_assignments?.map(a => a.subject?.name + ' (' + a.school_class?.name + ')') || []
             }));
             setTeachers(mapped);
         } catch (error) {
@@ -65,36 +63,106 @@ const UserManagement = () => {
     };
 
     useEffect(() => {
-        fetchTeachers();
-    }, []);
+        if (user?.establishment_id) {
+            fetchTeachers();
+        }
+    }, [user]);
 
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: { opacity: 1, transition: { duration: 0.5 } }
+    const handleOpenCreate = () => {
+        setEditingTeacher(null);
+        setFormData(initialFormState);
+        setIsCreateModalOpen(true);
+    };
+
+    const handleOpenEdit = (teacher) => {
+        // Splitting name is a bit hacky if stored as one string, but okay for now
+        // Or just ask for full name in edit? User wanted "Nom, Prenom".
+        // Let's try to split by space, or just use "Nom Complet" field if easier. 
+        // User explicitly asked for "Nom, Prenom". I will assume last word is First Name? No, that's bad.
+        // I will use two fields and just joining them.
+
+        const nameParts = teacher.name.split(' ');
+        const firstName = nameParts.pop() || '';
+        const lastName = nameParts.join(' ');
+
+        setEditingTeacher(teacher);
+        setFormData({
+            first_name: firstName,
+            last_name: lastName,
+            email: teacher.email,
+            phone: teacher.phone || '',
+            address: teacher.address || '',
+            password: '' // Keep empty
+        });
+        setIsCreateModalOpen(true);
+    };
+
+    const handleCreateOrUpdate = async () => {
+        if (!formData.last_name || !formData.first_name || !formData.email) {
+            return toast.error("Nom, Prénom et Email requis");
+        }
+        if (!editingTeacher && !formData.password) {
+            return toast.error("Mot de passe requis pour la création");
+        }
+
+        const payload = {
+            name: `${formData.last_name} ${formData.first_name}`,
+            email: formData.email,
+            phone: formData.phone,
+            address: formData.address,
+            establishment_id: user.establishment_id,
+            role: 'ENSEIGNANT'
+        };
+
+        if (formData.password) {
+            payload.password = formData.password;
+        }
+
+        setIsSubmitting(true);
+        try {
+            if (editingTeacher) {
+                await api.put(`/users/${editingTeacher.id}`, payload);
+                toast.success("Enseignant modifié !");
+            } else {
+                await api.post('/users', {
+                    ...payload,
+                    is_super_admin: false,
+                    can_generate_bulletins: false
+                });
+                toast.success("Enseignant créé !");
+            }
+            setIsCreateModalOpen(false);
+            fetchTeachers();
+        } catch (err) {
+            console.error(err);
+            toast.error(err.response?.data?.message || err.response?.data?.detail || "Erreur de traitement");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleClickDelete = (teacher) => {
+        setTeacherToDelete(teacher);
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!teacherToDelete) return;
+        try {
+            await api.delete(`/users/${teacherToDelete.id}`);
+            toast.success("Enseignant supprimé");
+            setIsDeleteModalOpen(false);
+            setTeacherToDelete(null);
+            fetchTeachers();
+        } catch (error) {
+            console.error(error);
+            toast.error("Erreur suppression");
+        }
     };
 
     const handleEditAssignments = (teacher) => {
         setSelectedTeacher(teacher);
         setIsAssignmentModalOpen(true);
-    };
-
-    // Create Teacher Logic
-    const [newTeacherData, setNewTeacherData] = useState({ name: '', email: '' });
-    const handleCreateTeacher = async () => {
-        if (!newTeacherData.name || !newTeacherData.email) return toast.error("Champs requis");
-        try {
-            await api.post('/users', {
-                ...newTeacherData,
-                is_super_admin: false,
-                can_generate_bulletins: false
-            });
-            toast.success("Enseignant créé !");
-            setIsCreateModalOpen(false);
-            setNewTeacherData({ name: '', email: '' });
-            fetchTeachers();
-        } catch (err) {
-            toast.error(err.response?.data?.detail || "Erreur création");
-        }
     };
 
     const [assignmentData, setAssignmentData] = useState({
@@ -112,7 +180,7 @@ const UserManagement = () => {
             user_id: selectedTeacher.id,
             subject_id: assignmentData.subject_id,
             class_id: assignmentData.class_id,
-            academic_year_id: 'cd173595-6a56-4c56-978d-6a56cd173595' // TODO: Get active year
+            academic_year_id: user?.establishment?.active_academic_year?.id
         });
 
         toast.promise(promise, {
@@ -124,10 +192,15 @@ const UserManagement = () => {
         try {
             await promise;
             setIsAssignmentModalOpen(false);
-            // Refresh logic if needed
+            fetchTeachers(); // Refresh to show new assignment count/badge
         } catch (error) {
             console.error(error);
         }
+    };
+
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: { opacity: 1, transition: { duration: 0.5 } }
     };
 
     return (
@@ -137,61 +210,21 @@ const UserManagement = () => {
             animate="visible"
             className="space-y-6"
         >
-            {/* ... Header ... */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Gestion du Personnel</h1>
-                    <p className="text-gray-500 mt-1">Gérez les comptes enseignants et leurs assignations de cours.</p>
+                    <p className="text-gray-500 mt-1">Gérez les comptes enseignants et leurs assignations.</p>
                 </div>
-                <Button icon={UserPlus} onClick={() => setIsCreateModalOpen(true)}>Nouvel Enseignant</Button>
+                <Button icon={UserPlus} onClick={handleOpenCreate}>Nouvel Enseignant</Button>
             </div>
 
-            {/* ... Stats ... */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card padding="sm" className="bg-blue-600 text-white">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-white/20 rounded-lg">
-                            <Users className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p className="text-sm opacity-80">Total Enseignants</p>
-                            <p className="text-2xl font-bold">84</p>
-                        </div>
-                    </div>
-                </Card>
-                <Card padding="sm">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-emerald-50 rounded-lg">
-                            <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500">Comptes Actifs</p>
-                            <p className="text-2xl font-bold text-gray-900">82</p>
-                        </div>
-                    </div>
-                </Card>
-                <Card padding="sm">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-amber-50 rounded-lg">
-                            <Shield className="w-6 h-6 text-amber-600" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500">Rôles Admin</p>
-                            <p className="text-2xl font-bold text-gray-900">12</p>
-                        </div>
-                    </div>
-                </Card>
-            </div>
-
-            {/* Teachers List Card */}
             <Card className="p-0 overflow-hidden">
                 <div className="p-6 border-b border-gray-100 bg-gray-50/50">
                     <div className="relative max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                            type="text"
+                        <Input
                             placeholder="Rechercher par nom, email..."
-                            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="pl-10"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
@@ -210,56 +243,81 @@ const UserManagement = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                            {teachers.filter(t => t.name.toLowerCase().includes(search.toLowerCase())).map((teacher) => (
-                                <tr key={teacher.id} className="hover:bg-gray-50/50 transition-colors group">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-600">
-                                                {teacher.name.split(' ').map(n => n[0]).join('')}
+                            {loading ? (
+                                [...Array(5)].map((_, i) => (
+                                    <tr key={i} className="animate-pulse">
+                                        <td className="px-6 py-4"><div className="h-10 bg-gray-100 rounded w-40"></div></td>
+                                        <td className="px-6 py-4"><div className="h-8 bg-gray-100 rounded w-32"></div></td>
+                                        <td className="px-6 py-4"><div className="h-6 bg-gray-100 rounded w-24"></div></td>
+                                        <td className="px-6 py-4"><div className="h-6 bg-gray-100 rounded w-16"></div></td>
+                                        <td className="px-6 py-4"><div className="h-8 bg-gray-100 rounded w-20 ml-auto"></div></td>
+                                    </tr>
+                                ))
+                            ) : (
+                                teachers.filter(t => t.name.toLowerCase().includes(search.toLowerCase())).map((teacher) => (
+                                    <tr key={teacher.id} className="hover:bg-gray-50/50 transition-colors group">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-600">
+                                                    {teacher.name.split(' ').map(n => n[0]).join('')}
+                                                </div>
+                                                <span className="text-sm font-semibold text-gray-900">{teacher.name}</span>
                                             </div>
-                                            <span className="text-sm font-semibold text-gray-900">{teacher.name}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-col">
-                                            <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                                                <Mail className="w-3 h-3" /> {teacher.email}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                                                    <Mail className="w-3 h-3" /> {teacher.email}
+                                                </div>
+                                                {teacher.phone && (
+                                                    <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-1">
+                                                        <Phone className="w-3 h-3" /> {teacher.phone}
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-1">
-                                                <Phone className="w-3 h-3" /> {teacher.phone}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {teacher.assignments.map((as, idx) => (
+                                                    <Badge key={idx} variant="primary" size="sm" className="text-[10px]">{as}</Badge>
+                                                ))}
+                                                <button
+                                                    onClick={() => handleEditAssignments(teacher)}
+                                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                                    title="Assigner des cours"
+                                                >
+                                                    <Edit className="w-3 h-3" />
+                                                </button>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {teacher.assignments.map((as, idx) => (
-                                                <Badge key={idx} variant="primary" size="sm">{as}</Badge>
-                                            ))}
-                                            <button
-                                                onClick={() => handleEditAssignments(teacher)}
-                                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <Badge
+                                                variant={teacher.status === 'Active' ? 'success' : 'warning'}
+                                                dot
                                             >
-                                                <Edit className="w-3 h-3" />
-                                            </button>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <Badge
-                                            variant={teacher.status === 'Active' ? 'success' : 'warning'}
-                                            dot
-                                        >
-                                            {teacher.status}
-                                        </Badge>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Button variant="ghost" size="sm" icon={Edit}>Profil</Button>
-                                            <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50" icon={Trash2} />
-                                        </div>
-                                        <MoreVertical className="w-5 h-5 text-gray-400 group-hover:hidden ml-auto" />
-                                    </td>
-                                </tr>
-                            ))}
+                                                {teacher.status}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    icon={Edit}
+                                                    onClick={() => handleOpenEdit(teacher)}
+                                                />
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-red-600 hover:bg-red-50"
+                                                    icon={Trash2}
+                                                    onClick={() => handleClickDelete(teacher)}
+                                                />
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>
@@ -281,26 +339,74 @@ const UserManagement = () => {
                 />
             </Modal>
 
-            {/* Create Teacher Modal */}
+            {/* Create/Edit Teacher Modal */}
             <Modal
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
-                title="Nouvel Enseignant"
-                description="Créer un nouveau compte enseignant."
+                title={editingTeacher ? "Modifier l'Enseignant" : "Nouvel Enseignant"}
             >
                 <div className="space-y-4">
-                    <Input
-                        label="Nom Complet"
-                        value={newTeacherData.name}
-                        onChange={(e) => setNewTeacherData({ ...newTeacherData, name: e.target.value })}
-                    />
+                    <div className="grid grid-cols-2 gap-4">
+                        <Input
+                            label="Nom"
+                            value={formData.last_name}
+                            onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                        />
+                        <Input
+                            label="Prénom"
+                            value={formData.first_name}
+                            onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                        />
+                    </div>
+
                     <Input
                         label="Email"
                         type="email"
-                        value={newTeacherData.email}
-                        onChange={(e) => setNewTeacherData({ ...newTeacherData, email: e.target.value })}
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     />
-                    <Button onClick={handleCreateTeacher} className="w-full">Créer</Button>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <Input
+                            label="Téléphone"
+                            value={formData.phone}
+                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        />
+                        <Input
+                            label="Adresse"
+                            value={formData.address}
+                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        />
+                    </div>
+
+                    <Input
+                        label={editingTeacher ? "Nouveau Mot de passe (laisser vide si inchangé)" : "Mot de passe"}
+                        type="password"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    />
+
+                    <Button onClick={handleCreateOrUpdate} className="w-full" disabled={isSubmitting} loading={isSubmitting}>
+                        {editingTeacher ? "Mettre à jour" : "Créer"}
+                    </Button>
+                </div>
+            </Modal>
+
+            {/* Delete Confirmation Modal */}
+            <Modal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                title="Confirmer la suppression"
+            >
+                <div className="space-y-4">
+                    <p className="text-gray-600">
+                        Êtes-vous sûr de vouloir supprimer l'enseignant <strong>{teacherToDelete?.name}</strong> ?
+                        Cette action supprimera également ses accès et assignations.
+                    </p>
+                    <div className="flex gap-3 justify-end">
+                        <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>Annuler</Button>
+                        <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={confirmDelete}>Supprimer</Button>
+                    </div>
                 </div>
             </Modal>
         </motion.div>

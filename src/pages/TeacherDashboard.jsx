@@ -13,50 +13,6 @@ import { Card, Button, Badge, StatsCard } from '../components/ui';
 import api from '../lib/api';
 import { useState, useEffect } from 'react';
 
-// Mock data for assigned classes
-const myClasses = [
-    {
-        id: 1,
-        name: '6ème A',
-        subject: 'SVT (Science)',
-        students: 24,
-        room: '201',
-        gradingProgress: 50,
-        status: 'pending',
-        studentsGraded: 12,
-    },
-    {
-        id: 2,
-        name: '3ème B',
-        subject: 'SVT (Science)',
-        students: 28,
-        room: '104',
-        gradingProgress: 100,
-        status: 'completed',
-        studentsGraded: 28,
-    },
-    {
-        id: 3,
-        name: '5ème C',
-        subject: 'Bio (Biology)',
-        students: 22,
-        room: '302',
-        gradingProgress: 10,
-        status: 'pending',
-        studentsGraded: 2,
-    },
-    {
-        id: 4,
-        name: '4ème A',
-        subject: 'Physique',
-        students: 30,
-        room: 'Lab 2',
-        gradingProgress: 100,
-        status: 'completed',
-        studentsGraded: 30,
-    },
-];
-
 const TeacherDashboard = ({ user }) => {
     const [myClasses, setMyClasses] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -65,8 +21,22 @@ const TeacherDashboard = ({ user }) => {
         const fetchMyClasses = async () => {
             if (!user?.id) return;
             try {
+                // Use the new teachers/my-assignments endpoint
                 const response = await api.get(`/teachers/my-assignments?user_id=${user.id}`);
-                setMyClasses(response.data);
+                // Map response to expected format
+                const mappedClasses = response.data.map(a => ({
+                    id: a.id,
+                    name: a.class_name,
+                    subject: a.subject_name,
+                    students: a.students || 0,
+                    room: a.room || '-',
+                    gradingProgress: a.grading_progress || 0,
+                    studentsGraded: a.students_graded || 0,
+                    status: a.status || 'pending',
+                    class_id: a.class_id,
+                    subject_id: a.subject_id,
+                }));
+                setMyClasses(mappedClasses);
             } catch (err) {
                 console.error("Error fetching classes:", err);
             } finally {

@@ -16,6 +16,8 @@ return new class extends Migration
             $table->string('name');
             $table->string('type'); // PRIMAIRE, COLLEGE, LYCEE
             $table->string('address')->nullable();
+            $table->string('city')->nullable();
+            $table->string('bp')->nullable();
             $table->string('phone')->nullable();
             $table->string('logo_url')->nullable();
             $table->json('grading_config')->nullable();

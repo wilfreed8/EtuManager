@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { MainLayout } from './components/layout';
 import { Toaster } from 'react-hot-toast';
@@ -11,13 +11,17 @@ import {
   Onboarding,
   StudentRegistration,
   UserManagement,
+  ClassManagement,
+  StudentManagement,
   GradeEntry,
   ReportCardGenerator,
-  SuperAdminDashboard
+  SuperAdminDashboard,
+  Settings
 } from './pages';
 import './index.css';
 
 function App() {
+  const location = useLocation();
   const [user, setUser] = useState(null);
 
   const handleLogin = (userData) => {
@@ -33,21 +37,21 @@ function App() {
     if (!user) return null;
 
     if (user.is_super_admin) {
-      return <SuperAdminDashboard />;
+      return <SuperAdminDashboard user={user} />;
     }
 
-    if (user.role === 'PROVISEUR' || user.role === 'CENSEUR' || user.role === 'SECRETAIRE') {
-      return <AdminDashboard />;
+    if (['PROVISEUR', 'CENSEUR', 'SECRETAIRE'].includes(user.role)) {
+      return <AdminDashboard user={user} />;
     }
 
     return <TeacherDashboard user={user} />;
   };
 
   return (
-    <BrowserRouter>
+    <>
+      <Toaster position="top-right" />
       <AnimatePresence mode="wait">
-        <Toaster position="top-right" />
-        <Routes>
+        <Routes location={location} key={location.pathname}>
           {/* Public Routes */}
           <Route path="/" element={<Landing />} />
           <Route path="/onboarding" element={<Onboarding />} />
@@ -76,39 +80,27 @@ function App() {
             <Route path="dashboard" element={getDashboardComponent()} />
 
             {/* Academic Routes */}
-            <Route path="students" element={<Navigate to="/students/register" replace />} />
-            <Route path="students/register" element={<StudentRegistration />} />
-            <Route path="teachers" element={<UserManagement />} />
-            <Route path="classes" element={<PlaceholderPage title="Gestion des Classes" />} />
+            <Route path="students" element={<StudentManagement user={user} />} />
+            <Route path="students/register" element={<StudentRegistration user={user} />} />
+            <Route path="teachers" element={<UserManagement user={user} />} />
+            <Route path="classes" element={<ClassManagement user={user} />} />
             <Route path="my-classes" element={<TeacherDashboard user={user} />} />
             <Route path="grades" element={<GradeEntry user={user} />} />
-            <Route path="reports" element={<ReportCardGenerator />} />
-            <Route path="settings" element={<PlaceholderPage title="Paramètres" />} />
+            <Route path="reports" element={<ReportCardGenerator user={user} />} />
+            <Route path="settings" element={<Settings user={user} />} />
 
             {/* Super Admin Routes */}
             <Route path="super-admin" element={<SuperAdminDashboard />} />
-            <Route path="super-admin/schools" element={<PlaceholderPage title="Gestion des Établissements" />} />
-            <Route path="super-admin/users" element={<PlaceholderPage title="Gestion des Utilisateurs" />} />
-            <Route path="super-admin/settings" element={<PlaceholderPage title="Paramètres Plateforme" />} />
+            <Route path="super-admin/schools" element={<div className="p-8 text-center text-gray-500">Gestion des Établissements (TBD)</div>} />
+            <Route path="super-admin/users" element={<div className="p-8 text-center text-gray-500">Gestion des Utilisateurs (TBD)</div>} />
+            <Route path="super-admin/settings" element={<div className="p-8 text-center text-gray-500">Paramètres Plateforme (TBD)</div>} />
           </Route>
 
           {/* 404 */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>
-    </BrowserRouter>
-  );
-}
-
-// Temporary placeholder component
-function PlaceholderPage({ title }) {
-  return (
-    <div className="flex items-center justify-center h-[60vh]">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">{title}</h1>
-        <p className="text-gray-500">Cette page sera implémentée prochainement.</p>
-      </div>
-    </div>
+    </>
   );
 }
 

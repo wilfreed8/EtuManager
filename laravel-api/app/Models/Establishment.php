@@ -14,6 +14,8 @@ class Establishment extends Model
         'name',
         'type',
         'address',
+        'city',
+        'bp',
         'phone',
         'logo_url',
         'grading_config',
@@ -27,5 +29,15 @@ class Establishment extends Model
     public function users()
     {
         return $this->hasMany(User::class);
+    }
+
+    public function academicYears()
+    {
+        return $this->hasMany(AcademicYear::class);
+    }
+
+    public function activeAcademicYear()
+    {
+        return $this->hasOne(AcademicYear::class)->where('is_active', true);
     }
 }

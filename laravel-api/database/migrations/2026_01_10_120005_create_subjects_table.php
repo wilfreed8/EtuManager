@@ -14,6 +14,8 @@ return new class extends Migration
         Schema::create('subjects', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('name');
+            $table->string('code')->nullable();
+            $table->string('category')->nullable(); // MATIERES LITTERAIRES, MATIERES SCIENTIFIQUES, AUTRES
             $table->integer('coefficient')->default(1);
             $table->foreignUuid('establishment_id')->constrained('establishments')->onDelete('cascade');
             $table->timestamps();

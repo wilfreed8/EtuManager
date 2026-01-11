@@ -17,13 +17,18 @@ import {
 import { Card, Button, Input, Select, Badge } from '../components/ui';
 import { toast } from 'react-hot-toast';
 
-const StudentRegistration = () => {
+const StudentRegistration = ({ user }) => {
     const [classes, setClasses] = useState([]);
 
     useEffect(() => {
         const fetchClasses = async () => {
             try {
-                const response = await api.get('/classes/');
+                const response = await api.get('/classes', {
+                    params: {
+                        establishment_id: user?.establishment_id,
+                        academic_year_id: user?.establishment?.active_academic_year?.id
+                    }
+                });
                 setClasses(response.data);
             } catch (err) {
                 console.error(err);
@@ -33,20 +38,22 @@ const StudentRegistration = () => {
         fetchClasses();
     }, []);
 
+    const activeYear = user?.establishment?.active_academic_year;
+
     const [formData, setFormData] = useState({
         firstName: '',
         lastName: '',
         birthDate: '',
         gender: 'M',
         address: '',
-        city: 'Lomé',
+        city: user?.establishment?.city || 'Lomé',
         phoneNumber: '',
         email: '',
 
         // Academic Info
         classId: '',
-        academicYear: '2024-2025',
-        registrationNumber: 'REG-2024-001', // Ideally auto-generated
+        academicYear: activeYear?.label || '2024-2025',
+        registrationNumber: 'REG-' + new Date().getFullYear() + '-' + Math.floor(Math.random() * 1000).toString().padStart(3, '0'),
 
         // Parent Info
         parentName: '',
@@ -65,46 +72,39 @@ const StudentRegistration = () => {
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
 
-        const promise = fetch('http://localhost:8000/api/students/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                first_name: formData.firstName,
-                last_name: formData.lastName,
-                birth_date: formData.birthDate || null,
-                gender: formData.gender,
-                address: formData.address,
-                phone: formData.phoneNumber,
-                email: formData.email || null,
-                registration_number: formData.registrationNumber,
-                establishment_id: '8ded3123-5e93-4702-861f-9c60e3cc6a34',
-                class_id: '67448d3c-6f81-4b71-97b7-6de7112000ed',
-                academic_year_id: 'cd173595-6a56-4c56-978d-6a56cd173595',
-                parent_name: formData.parentName,
-                parent_phone: formData.parentPhone,
-                parent_email: formData.parentEmail || null,
-                parent_profession: formData.parentProfession
-            }),
-        }).then(async res => {
-            if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.detail || 'Failed to register student');
-            }
-            return res.json();
+        if (!formData.classId) {
+            toast.error("Veuillez sélectionner une classe");
+            return;
+        }
+
+        const promise = api.post('/students', {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            birth_date: formData.birthDate || null,
+            gender: formData.gender,
+            address: formData.address,
+            phone: formData.phoneNumber,
+            email: formData.email || null,
+            registration_number: formData.registrationNumber,
+            establishment_id: user?.establishment_id,
+            class_id: formData.classId,
+            academic_year_id: activeYear?.id,
+            parent_name: formData.parentName,
+            parent_phone: formData.parentPhone,
+            parent_email: formData.parentEmail || null,
+            parent_profession: formData.parentProfession
         });
 
         toast.promise(promise, {
             loading: 'Enregistrement de l\'élève en cours...',
             success: 'Élève enregistré avec succès !',
-            error: (err) => `Erreur : ${err.message}`,
+            error: (err) => `Erreur : ${err.response?.data?.message || err.message}`,
         });
 
         try {
             setLoading(true);
             await promise;
-            // Reset form or redirect
+            // Optionally reset form
         } catch (error) {
             console.error(error);
         } finally {

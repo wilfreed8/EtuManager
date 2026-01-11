@@ -22,6 +22,8 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
+        'address',
         'password',
         'avatar_url',
         'is_super_admin',
@@ -38,6 +40,8 @@ class User extends Authenticatable
         'password',
         'remember_token',
     ];
+
+    protected $appends = ['role'];
 
     /**
      * Get the attributes that should be cast.
@@ -62,5 +66,15 @@ class User extends Authenticatable
     public function roles()
     {
         return $this->belongsToMany(Role::class, 'user_roles');
+    }
+
+    public function teacherAssignments()
+    {
+        return $this->hasMany(TeacherAssignment::class);
+    }
+
+    public function getRoleAttribute()
+    {
+        return $this->roles->first()->name ?? 'ENSEIGNANT';
     }
 }

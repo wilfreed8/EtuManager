@@ -23,6 +23,7 @@ class Student extends Model
         'establishment_id',
         'parent_name',
         'parent_phone',
+        'parent_address',
         'parent_email',
         'parent_profession',
     ];

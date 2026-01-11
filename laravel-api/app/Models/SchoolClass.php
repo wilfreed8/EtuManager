@@ -14,6 +14,7 @@ class SchoolClass extends Model
 
     protected $fillable = [
         'name',
+        'room',
         'academic_year_id',
         'establishment_id',
     ];
@@ -32,5 +33,15 @@ class SchoolClass extends Model
     {
         return $this->belongsToMany(Student::class, 'student_enrollments', 'class_id', 'student_id')
                     ->withPivot('academic_year_id');
+    }
+
+    public function enrollments()
+    {
+        return $this->hasMany(StudentEnrollment::class, 'class_id');
+    }
+
+    public function teacherAssignments()
+    {
+        return $this->hasMany(TeacherAssignment::class, 'class_id');
     }
 }

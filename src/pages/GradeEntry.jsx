@@ -14,42 +14,71 @@ import { toast } from 'react-hot-toast';
 const GradeEntry = ({ user }) => {
     const [students, setStudents] = useState([]);
     const [assignments, setAssignments] = useState([]);
+    const [periods, setPeriods] = useState([]);
     const [selectedAssignment, setSelectedAssignment] = useState(null);
+    const [selectedPeriod, setSelectedPeriod] = useState('');
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
     const fileInputRef = useRef(null);
 
-    // Fetch assignments on load
+    // Fetch assignments and periods on load
     useEffect(() => {
-        const fetchAssignments = async () => {
+        const fetchInitialData = async () => {
             if (!user?.id) return;
             try {
-                const res = await api.get(`/teachers/my-assignments?user_id=${user.id}`);
-                setAssignments(res.data);
-                if (res.data.length > 0) {
-                    setSelectedAssignment(res.data[0]);
+                // Fetch teacher assignments
+                const assignRes = await api.get(`/teachers/my-assignments?user_id=${user.id}`);
+                const mappedAssignments = assignRes.data.map(a => ({
+                    id: a.id,
+                    class_id: a.class_id,
+                    class_name: a.class_name,
+                    subject_id: a.subject_id,
+                    subject_name: a.subject_name,
+                }));
+                setAssignments(mappedAssignments);
+                if (mappedAssignments.length > 0) {
+                    setSelectedAssignment(mappedAssignments[0]);
+                }
+
+                // Fetch periods
+                const periodRes = await api.get('/periods');
+                setPeriods(periodRes.data);
+                if (periodRes.data.length > 0) {
+                    setSelectedPeriod(periodRes.data[0].id);
                 }
             } catch (err) {
-                console.error("Error fetching assignments", err);
-                toast.error("Erreur chargement assignations");
+                console.error("Error fetching initial data", err);
+                toast.error("Erreur chargement données");
             }
         };
-        fetchAssignments();
+        fetchInitialData();
     }, [user?.id]);
 
-    // Fetch students when assignment changes
+    // Fetch students and their existing grades when assignment or period changes
     useEffect(() => {
-        const fetchStudents = async () => {
-            if (!selectedAssignment) return;
+        const fetchStudentsWithGrades = async () => {
+            if (!selectedAssignment || !selectedPeriod) return;
             setLoading(true);
             try {
-                const response = await api.get(`/students/?class_id=${selectedAssignment.class_id}`);
+                // Fetch students for the class
+                const studentsRes = await api.get(`/students?class_id=${selectedAssignment.class_id}`);
 
-                const mappedStudents = response.data.map(s => ({
+                // Fetch existing grades for this class/subject/period
+                const gradesRes = await api.get(`/grades?subject_id=${selectedAssignment.subject_id}&period_id=${selectedPeriod}`);
+                const gradesMap = {};
+                gradesRes.data.forEach(g => {
+                    gradesMap[g.student_id] = {
+                        interro: g.interro_avg !== null ? String(g.interro_avg) : '',
+                        devoir: g.devoir_avg !== null ? String(g.devoir_avg) : '',
+                        compo: g.compo_grade !== null ? String(g.compo_grade) : ''
+                    };
+                });
+
+                const mappedStudents = studentsRes.data.map(s => ({
                     id: s.id,
                     name: `${s.last_name} ${s.first_name}`,
                     matricule: s.registration_number,
-                    grades: { interro: '', devoir: '', compo: '' } // Placeholder for real grades
+                    grades: gradesMap[s.id] || { interro: '', devoir: '', compo: '' }
                 }));
                 setStudents(mappedStudents);
 
@@ -60,8 +89,8 @@ const GradeEntry = ({ user }) => {
                 setLoading(false);
             }
         };
-        fetchStudents();
-    }, [selectedAssignment]);
+        fetchStudentsWithGrades();
+    }, [selectedAssignment, selectedPeriod]);
 
     const handleAssignmentChange = (assignmentId) => {
         const assign = assignments.find(a => a.id === assignmentId);
@@ -88,12 +117,14 @@ const GradeEntry = ({ user }) => {
         setLoading(true);
         try {
             const promises = students.map(student => {
-                // Determine if we should save (e.g. at least one grade entered)
-                // For now, simple mock-ish save call
-                return api.post('/grades/', {
+                // Only save if at least one grade is entered
+                if (!student.grades.interro && !student.grades.devoir && !student.grades.compo) {
+                    return Promise.resolve();
+                }
+                return api.post('/grades', {
                     student_id: student.id,
-                    subject_id: selectedAssignment?.subject_id || 'MATH',
-                    period_id: 'T1',
+                    subject_id: selectedAssignment?.subject_id,
+                    period_id: selectedPeriod,
                     interro_avg: student.grades.interro ? parseFloat(student.grades.interro) : null,
                     devoir_avg: student.grades.devoir ? parseFloat(student.grades.devoir) : null,
                     compo_grade: student.grades.compo ? parseFloat(student.grades.compo) : null
@@ -116,7 +147,7 @@ const GradeEntry = ({ user }) => {
             const formData = new FormData();
             formData.append('file', file);
             try {
-                await api.post(`/grades/upload?class_id=${selectedAssignment?.class_id}&period_id=T1&subject_id=${selectedAssignment?.subject_id}`, formData, {
+                await api.post(`/grades/upload?class_id=${selectedAssignment?.class_id}&period_id=${selectedPeriod}&subject_id=${selectedAssignment?.subject_id}`, formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
                 toast.success(`Fichier "${file.name}" importé avec succès !`);
@@ -143,7 +174,10 @@ const GradeEntry = ({ user }) => {
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Saisie des Notes</h1>
                     {selectedAssignment && (
-                        <p className="text-gray-500 mt-1">Classe: {selectedAssignment.class_name} • Matière: {selectedAssignment.subject_name} • Trimestre 1</p>
+                        <p className="text-gray-500 mt-1">
+                            Classe: {selectedAssignment.class_name} • Matière: {selectedAssignment.subject_name} •
+                            {periods.find(p => p.id === selectedPeriod)?.name || 'Période'}
+                        </p>
                     )}
                 </div>
                 <div className="flex gap-3">
@@ -184,8 +218,9 @@ const GradeEntry = ({ user }) => {
                     />
                     <Select
                         label="Période"
-                        options={[{ value: 'T1', label: 'Trimestre 1' }]}
-                        value="T1"
+                        options={periods.map(p => ({ value: p.id, label: p.name }))}
+                        value={selectedPeriod}
+                        onChange={(e) => setSelectedPeriod(e.target.value)}
                     />
                 </div>
             </Card>

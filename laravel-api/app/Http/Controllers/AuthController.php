@@ -30,7 +30,7 @@ class AuthController extends Controller
         return response()->json([
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user->load('establishment', 'roles'),
+            'user' => $user->load('establishment.activeAcademicYear', 'roles'),
         ]);
     }
 
@@ -43,6 +43,6 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return $request->user()->load('establishment', 'roles');
+        return $request->user()->load('establishment.activeAcademicYear', 'roles');
     }
 }

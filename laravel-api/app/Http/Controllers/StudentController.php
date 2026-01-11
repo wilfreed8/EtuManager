@@ -31,13 +31,26 @@ class StudentController extends Controller
             'last_name' => 'required|string',
             'birth_date' => 'nullable|date',
             'gender' => 'nullable|string|in:M,F',
+            'address' => 'nullable|string',
             'establishment_id' => 'required|exists:establishments,id',
             'registration_number' => 'nullable|string|unique:students,registration_number',
-            // Parent info validation...
             'parent_name' => 'nullable|string',
+            'parent_phone' => 'nullable|string',
+            'parent_address' => 'nullable|string',
+            'class_id' => 'nullable|exists:classes,id',
         ]);
 
-        return Student::create($validated);
+        $student = Student::create($validated);
+
+        if ($request->has('class_id') && $request->class_id) {
+            \App\Models\StudentEnrollment::create([
+                'student_id' => $student->id,
+                'class_id' => $request->class_id,
+                'academic_year_id' => \App\Models\SchoolClass::find($request->class_id)->academic_year_id,
+            ]);
+        }
+
+        return $student;
     }
 
     public function show(Student $student)
@@ -48,6 +61,12 @@ class StudentController extends Controller
     public function update(Request $request, Student $student)
     {
         $student->update($request->all());
+
+        if ($request->has('class_id')) {
+             // Handle class change logic if needed, simplify for now or assuming just profile update
+             // If class change is needed, we need to update/create enrollment for current year
+        }
+
         return $student;
     }
 

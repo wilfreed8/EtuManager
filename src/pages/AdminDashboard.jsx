@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
     Users,
@@ -16,15 +17,14 @@ import { DonutChart } from '../components/charts';
 import api from '../lib/api';
 import { useEffect } from 'react';
 
-// Mock data
+// Note: Recent logins would need a separate audit log API - keeping placeholder for now
 const recentLogins = [
     { user: 'Sarah Jenkins', role: 'Teacher', time: 'Today, 09:41 AM', ip: '192.168.1.42', status: 'success' },
     { user: 'Mark Davis', role: 'Admin', time: 'Today, 09:15 AM', ip: '192.168.1.10', status: 'success' },
-    { user: 'Emily Chen', role: 'Staff', time: 'Today, 08:30 AM', ip: '10.0.0.55', status: '2fa' },
-    { user: 'James Wilson', role: 'Teacher', time: 'Yesterday, 11:45 PM', ip: '172.16.0.23', status: 'failed' },
 ];
 
 const AdminDashboard = () => {
+    const navigate = useNavigate();
     const [stats, setStats] = useState({
         totalStudents: 0,
         totalTeachers: 0,
@@ -42,9 +42,11 @@ const AdminDashboard = () => {
                 const response = await api.get('/stats');
                 setStats(prev => ({
                     ...prev,
-                    totalStudents: response.data.students_count,
-                    totalTeachers: response.data.teachers_count,
-                    classesManaged: response.data.classes_count,
+                    totalStudents: response.data.students_count || 0,
+                    totalTeachers: response.data.teachers_count || 0,
+                    classesManaged: response.data.classes_count || 0,
+                    gradesSubmitted: response.data.grades_submitted || 0,
+                    gradesPending: response.data.grades_pending || 0,
                 }));
             } catch (err) {
                 console.error("Error fetching stats:", err);
@@ -56,9 +58,9 @@ const AdminDashboard = () => {
     }, []);
 
 
-    const gradePercentage = Math.round(
-        (stats.gradesSubmitted / (stats.gradesSubmitted + stats.gradesPending)) * 100
-    );
+    const gradePercentage = stats.gradesSubmitted + stats.gradesPending > 0
+        ? Math.round((stats.gradesSubmitted / (stats.gradesSubmitted + stats.gradesPending)) * 100)
+        : 0;
 
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -87,10 +89,10 @@ const AdminDashboard = () => {
                     <p className="text-gray-500 mt-1">Here is what's happening at your school today.</p>
                 </div>
                 <div className="flex gap-3">
-                    <Button variant="outline" icon={UserPlus}>
+                    <Button variant="outline" icon={UserPlus} onClick={() => navigate('/teachers')}>
                         Add Teacher
                     </Button>
-                    <Button variant="outline" icon={FileText}>
+                    <Button variant="outline" icon={FileText} onClick={() => navigate('/reports')}>
                         Generate Bulletins
                     </Button>
                     <Button icon={Activity}>

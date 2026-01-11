@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import api from '../lib/api';
 import { gsap } from 'gsap';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -358,12 +359,12 @@ const Onboarding = () => {
 
         setIsSubmitting(true);
 
-        const promise = new Promise((resolve) => setTimeout(resolve, 2000));
+        const promise = api.post('/onboarding', formData);
 
         toast.promise(promise, {
             loading: 'Création de votre plateforme en cours...',
             success: 'Plateforme créée avec succès ! Bienvenue.',
-            error: 'Une erreur est survenue lors de la création.',
+            error: (err) => `Erreur : ${err.response?.data?.message || err.message}`,
         });
 
         try {
