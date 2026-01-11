@@ -18,11 +18,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('establishments', EstablishmentController::class);
     Route::apiResource('academic-years', \App\Http\Controllers\AcademicYearController::class);
     Route::apiResource('periods', \App\Http\Controllers\PeriodController::class);
+    Route::post('/periods/{period}/activate', [\App\Http\Controllers\PeriodController::class, 'activate']);
+    Route::get('/active-period', [\App\Http\Controllers\PeriodController::class, 'getActive']);
     Route::apiResource('classes', \App\Http\Controllers\SchoolClassController::class)->parameters(['classes' => 'schoolClass']);
     Route::apiResource('students', \App\Http\Controllers\StudentController::class);
     Route::apiResource('enrollments', \App\Http\Controllers\StudentEnrollmentController::class)->only(['store', 'destroy']);
     Route::apiResource('teacher-assignments', \App\Http\Controllers\TeacherAssignmentController::class)->except(['update', 'show']); // Often just add/remove
     Route::apiResource('grades', \App\Http\Controllers\GradeController::class)->only(['index', 'store']);
+    Route::apiResource('subjects', \App\Http\Controllers\SubjectController::class);
+    
+    // Import
+    Route::post('/students/import', [\App\Http\Controllers\StudentController::class, 'import']);
+    Route::post('/users/import', [\App\Http\Controllers\UserController::class, 'import']);
     
     Route::get('/stats', [\App\Http\Controllers\DashboardController::class, 'stats']);
     

@@ -45,6 +45,7 @@ class BulletinController extends Controller
             return response()->json(['error' => 'No students found in this class'], 404);
         }
 
+        $format = $request->query('format', 'html'); // 'html', 'pdf'
         $zipFileName = 'Bulletins_' . $schoolClass->name . '_' . now()->timestamp . '.zip';
         $zipPath = storage_path('app/public/' . $zipFileName);
 
@@ -52,19 +53,18 @@ class BulletinController extends Controller
         if ($zip->open($zipPath, ZipArchive::CREATE) === TRUE) {
             foreach ($enrollments as $enrollment) {
                 $student = $enrollment->student;
-                
-                // Prepare Data
                 $data = $this->prepareBulletinData($student, $period);
-                
-                // Skip if error (e.g. not enrolled properly, shouldn't happen due to query above but safe check)
                 if (isset($data['error'])) continue;
 
-                // Render View
-                $html = view('bulletin', $data)->render();
-                
-                // Add to ZIP
-                $filename = str_replace(' ', '_', $student->last_name . '_' . $student->first_name) . '.html';
-                $zip->addFromString($filename, $html);
+                $filenameBase = str_replace(' ', '_', $student->last_name . '_' . $student->first_name);
+
+                if ($format === 'pdf' && class_exists('Barryvdh\DomPDF\Facade\Pdf')) {
+                    $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('bulletin', $data);
+                    $zip->addFromString($filenameBase . '.pdf', $pdf->output());
+                } else {
+                    $html = view('bulletin', $data)->render();
+                    $zip->addFromString($filenameBase . '.html', $html);
+                }
             }
             $zip->close();
         } else {

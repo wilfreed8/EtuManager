@@ -39,9 +39,41 @@ class PeriodController extends Controller
         return $period;
     }
 
-    public function destroy(Period $period)
+    public function activate(Period $period)
     {
-        $period->delete();
-        return response()->noContent();
+        // Only admins can activate a period
+        if (!in_array(auth()->user()->role, ['PROVISEUR', 'CENSEUR', 'ADMIN', 'SUPER_ADMIN'])) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        // Deactivate all periods in the same academic year
+        Period::where('academic_year_id', $period->academic_year_id)
+            ->update(['is_active' => false]);
+
+        // Activate the chosen one
+        $period->update(['is_active' => true]);
+
+        return response()->json(['message' => "Période {$period->name} activée", 'period' => $period]);
+    }
+
+    public function getActive(Request $request)
+    {
+        $establishmentId = $request->query('establishment_id');
+        if (!$establishmentId && auth()->check()) {
+            $establishmentId = auth()->user()->establishment_id;
+        }
+
+        if (!$establishmentId) {
+            return response()->json(['message' => 'Établissement non spécifié'], 400);
+        }
+
+        $activePeriod = Period::whereHas('academicYear', function ($q) use ($establishmentId) {
+            $q->where('establishment_id', $establishmentId)
+              ->where('is_active', true); // active academic year
+        })
+        ->where('is_active', true)
+        ->first();
+
+        return $activePeriod;
     }
 }

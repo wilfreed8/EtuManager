@@ -1,8 +1,23 @@
 import { Bell, Search, ChevronRight } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import api from '../../lib/api';
 
 const Header = ({ user }) => {
     const location = useLocation();
+    const [activePeriod, setActivePeriod] = useState(null);
+
+    useEffect(() => {
+        const fetchActivePeriod = async () => {
+            try {
+                const response = await api.get('/active-period');
+                setActivePeriod(response.data);
+            } catch (err) {
+                console.error("Error fetching active period", err);
+            }
+        };
+        fetchActivePeriod();
+    }, []);
 
     // Generate breadcrumbs from path
     const getBreadcrumbs = () => {
@@ -39,24 +54,33 @@ const Header = ({ user }) => {
 
     return (
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
-            {/* Breadcrumbs */}
-            <nav className="flex items-center gap-2 text-sm">
-                {breadcrumbs.map((crumb, index) => (
-                    <div key={crumb.path} className="flex items-center gap-2">
-                        {index > 0 && <ChevronRight className="w-4 h-4 text-gray-400" />}
-                        {index === breadcrumbs.length - 1 ? (
-                            <span className="text-gray-900 font-medium">{crumb.label}</span>
-                        ) : (
-                            <Link
-                                to={crumb.path}
-                                className="text-gray-500 hover:text-gray-700 transition-colors"
-                            >
-                                {crumb.label}
-                            </Link>
-                        )}
+            {/* Breadcrumbs & Active Period Tag */}
+            <div className="flex items-center gap-6">
+                <nav className="flex items-center gap-2 text-sm">
+                    {breadcrumbs.map((crumb, index) => (
+                        <div key={crumb.path} className="flex items-center gap-2">
+                            {index > 0 && <ChevronRight className="w-4 h-4 text-gray-400" />}
+                            {index === breadcrumbs.length - 1 ? (
+                                <span className="text-gray-900 font-medium">{crumb.label}</span>
+                            ) : (
+                                <Link
+                                    to={crumb.path}
+                                    className="text-gray-500 hover:text-gray-700 transition-colors"
+                                >
+                                    {crumb.label}
+                                </Link>
+                            )}
+                        </div>
+                    ))}
+                </nav>
+
+                {activePeriod && (
+                    <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-xs font-bold">
+                        <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+                        {activePeriod.name}
                     </div>
-                ))}
-            </nav>
+                )}
+            </div>
 
             {/* Right Section */}
             <div className="flex items-center gap-4">

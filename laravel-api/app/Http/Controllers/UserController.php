@@ -11,7 +11,7 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::query()->with(['roles', 'teacherAssignments']);
+        $query = User::query()->with(['roles', 'teacherAssignments.subject', 'teacherAssignments.schoolClass']);
 
         if ($request->has('role')) {
             $roleName = $request->role;
@@ -72,5 +72,56 @@ class UserController extends Controller
     {
         $user->delete();
         return response()->noContent();
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt,xlsx,xls',
+            'establishment_id' => 'required|exists:establishments,id'
+        ]);
+
+        $file = $request->file('file');
+        
+        try {
+            $data = \Maatwebsite\Excel\Facades\Excel::toCollection(new \stdClass, $file);
+            $rows = $data[0] ?? collect([]);
+            
+            if ($rows->count() > 0) {
+                 $firstRow = $rows->first();
+                 if (is_string($firstRow[0]) && str_contains(strtolower($firstRow[0]), 'first_name')) {
+                     $rows->shift();
+                 }
+            }
+
+            $count = 0;
+            $role = Role::where('name', 'ENSEIGNANT')->first();
+
+            foreach ($rows as $row) {
+                // first_name, last_name, email, phone, address, specialite
+                if (!isset($row[2])) continue;
+
+                $email = $row[2];
+                if (User::where('email', $email)->exists()) continue;
+
+                $user = User::create([
+                    'name' => $row[0] . ' ' . $row[1],
+                    'email' => $email,
+                    'phone' => $row[3] ?? null,
+                    'address' => $row[4] ?? null,
+                    'establishment_id' => $request->establishment_id,
+                    'password' => Hash::make('password123'),
+                ]);
+
+                if ($role) {
+                    $user->roles()->attach($role->id, ['establishment_id' => $request->establishment_id]);
+                }
+                $count++;
+            }
+
+            return response()->json(['message' => "$count enseignants importés"]);
+        } catch (\Exception $e) {
+             return response()->json(['message' => "Erreur import: " . $e->getMessage()], 500);
+        }
     }
 }

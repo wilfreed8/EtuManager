@@ -9,7 +9,7 @@ class SchoolClassController extends Controller
 {
     public function index(Request $request)
     {
-        $query = SchoolClass::query();
+        $query = SchoolClass::query()->withCount('students');
         if ($request->has('academic_year_id')) {
             $query->where('academic_year_id', $request->academic_year_id);
         }

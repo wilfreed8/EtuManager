@@ -11,8 +11,8 @@ const AssignmentForm = ({ teacher, onSuccess, assignmentData, setAssignmentData,
         const fetchData = async () => {
             try {
                 const [classRes, subjectRes] = await Promise.all([
-                    api.get('/classes/'),
-                    api.get('/subjects/')
+                    api.get('/classes'),
+                    api.get('/subjects')
                 ]);
 
                 setClasses(classRes.data.map(c => ({ value: c.id, label: c.name })));

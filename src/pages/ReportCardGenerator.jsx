@@ -19,6 +19,7 @@ const ReportCardGenerator = ({ user }) => {
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
     const [downloadingBulk, setDownloadingBulk] = useState(false);
+    const [downloadFormat, setDownloadFormat] = useState('pdf'); // 'pdf' or 'docx' or 'html'
 
     // Fetch classes and periods
     useEffect(() => {
@@ -58,13 +59,20 @@ const ReportCardGenerator = ({ user }) => {
     // Fetch students when filters change
     useEffect(() => {
         const fetchStudents = async () => {
-            if (!selectedClass) return;
+            if (!selectedClass || !selectedPeriod) {
+                setStudents([]);
+                return;
+            }
+
             setLoading(true);
             try {
-                // Fetch students for the class (backend handles filtering if enrollment exists)
-                // Using class_id on student controller only works if enrollment is correct.
-                // Assuming students enrollments are created.
-                const response = await api.get(`/students?class_id=${selectedClass}`);
+                // Fetch students for the class
+                const response = await api.get(`/students`, {
+                    params: {
+                        class_id: selectedClass,
+                        establishment_id: user?.establishment_id
+                    }
+                });
 
                 const mapped = response.data.map(s => ({
                     id: s.id,
@@ -81,7 +89,7 @@ const ReportCardGenerator = ({ user }) => {
             }
         };
         fetchStudents();
-    }, [selectedClass, selectedPeriod]);
+    }, [selectedClass, selectedPeriod, user?.establishment_id]);
 
     const handleDownloadIndividual = async (studentId) => {
         if (!selectedPeriod) {
@@ -126,6 +134,9 @@ const ReportCardGenerator = ({ user }) => {
         try {
             // We request a ZIP blob directly
             const response = await api.get(`/bulletins/class/${selectedClass}/period/${selectedPeriod}`, {
+                params: {
+                    format: downloadFormat
+                },
                 responseType: 'blob'
             });
 
@@ -176,7 +187,7 @@ const ReportCardGenerator = ({ user }) => {
                         disabled={downloadingBulk || students.length === 0}
                         onClick={handleDownloadBulk}
                     >
-                        Télécharger Tout (ZIP)
+                        Télécharger Tout
                     </Button>
                 </div>
             </div>
@@ -202,7 +213,20 @@ const ReportCardGenerator = ({ user }) => {
                         {periods.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </Select>
 
-                    <div className="md:col-span-2">
+                    <div className="md:col-span-1">
+                        <Select
+                            label="Format"
+                            value={downloadFormat}
+                            onChange={(e) => setDownloadFormat(e.target.value)}
+                            options={[
+                                { value: 'pdf', label: 'PDF (Recommandé)' },
+                                { value: 'html', label: 'HTML (Web)' },
+                                // { value: 'docx', label: 'Word (DOCX)' } // Backend support TBD
+                            ]}
+                        />
+                    </div>
+
+                    <div className="md:col-span-1">
                         <Input
                             label="Rechercher un élève"
                             placeholder="Nom ou Matricule..."
@@ -262,7 +286,10 @@ const ReportCardGenerator = ({ user }) => {
                             {students.length === 0 && !loading && (
                                 <tr>
                                     <td colSpan="3" className="px-6 py-8 text-center text-gray-500">
-                                        Aucun élève trouvé dans cette classe.
+                                        {!selectedPeriod
+                                            ? "Veuillez sélectionner un semestre pour afficher la liste."
+                                            : "Aucun élève trouvé dans cette classe."
+                                        }
                                     </td>
                                 </tr>
                             )}

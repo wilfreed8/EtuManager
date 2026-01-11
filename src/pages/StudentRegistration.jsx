@@ -9,16 +9,17 @@ import {
     MapPin,
     UserCircle,
     GraduationCap,
-    Users,
-    Save,
     Trash2,
-    Camera
+    Camera,
+    FileUp
 } from 'lucide-react';
 import { Card, Button, Input, Select, Badge } from '../components/ui';
 import { toast } from 'react-hot-toast';
+import ImportModal from '../components/ImportModal';
 
 const StudentRegistration = ({ user }) => {
     const [classes, setClasses] = useState([]);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
     useEffect(() => {
         const fetchClasses = async () => {
@@ -130,10 +131,19 @@ const StudentRegistration = ({ user }) => {
                     <p className="text-gray-500 mt-1">Enregistrement d'un nouvel élève dans le système.</p>
                 </div>
                 <div className="flex gap-3">
+                    <Button variant="outline" onClick={() => setIsImportModalOpen(true)} icon={FileUp}>Importer CSV</Button>
                     <Button variant="outline" icon={Trash2}>Annuler</Button>
                     <Button icon={Save} loading={loading} onClick={handleSubmit}>Enregistrer l'élève</Button>
                 </div>
             </div>
+
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                type="students"
+                establishmentId={user?.establishment_id}
+                onSuccess={() => toast.success("Importation terminée")}
+            />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Column: Photo & Academic Info */}

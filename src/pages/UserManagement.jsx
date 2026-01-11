@@ -16,6 +16,8 @@ import { Card, Button, Input, Select, Badge, Modal } from '../components/ui';
 import api from '../lib/api';
 import { toast } from 'react-hot-toast';
 import AssignmentForm from '../components/AssignmentForm';
+import ImportModal from '../components/ImportModal';
+import { FileUp } from 'lucide-react';
 
 const UserManagement = ({ user }) => {
     const [teachers, setTeachers] = useState([]);
@@ -23,6 +25,7 @@ const UserManagement = ({ user }) => {
     const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
     const [selectedTeacher, setSelectedTeacher] = useState(null);
     const [editingTeacher, setEditingTeacher] = useState(null);
@@ -176,7 +179,7 @@ const UserManagement = ({ user }) => {
             return;
         }
 
-        const promise = api.post('/teachers/assignments', {
+        const promise = api.post('/teacher-assignments', {
             user_id: selectedTeacher.id,
             subject_id: assignmentData.subject_id,
             class_id: assignmentData.class_id,
@@ -215,8 +218,19 @@ const UserManagement = ({ user }) => {
                     <h1 className="text-2xl font-bold text-gray-900">Gestion du Personnel</h1>
                     <p className="text-gray-500 mt-1">Gérez les comptes enseignants et leurs assignations.</p>
                 </div>
-                <Button icon={UserPlus} onClick={handleOpenCreate}>Nouvel Enseignant</Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" icon={FileUp} onClick={() => setIsImportModalOpen(true)}>Importer</Button>
+                    <Button icon={UserPlus} onClick={handleOpenCreate}>Nouvel Enseignant</Button>
+                </div>
             </div>
+
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                type="teachers"
+                establishmentId={user?.establishment_id}
+                onSuccess={fetchTeachers}
+            />
 
             <Card className="p-0 overflow-hidden">
                 <div className="p-6 border-b border-gray-100 bg-gray-50/50">

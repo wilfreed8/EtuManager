@@ -8,9 +8,8 @@ import { toast } from 'react-hot-toast';
 const Settings = ({ user }) => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [periods, setPeriods] = useState([]);
     const [establishment, setEstablishment] = useState(null);
-
-    // Form State
     const [formData, setFormData] = useState({
         name: '',
         type: '',
@@ -18,27 +17,28 @@ const Settings = ({ user }) => {
         phone: '',
         period_type: 'TRIMESTRE',
     });
-
-    // Grading Config State (Generic JSON editor style or specific fields)
-    // Assuming simple structure for now or just school details + grading type
-    // The user mentioned "toutes les informations saisie lors de l onboarding"
-    // Onboarding had: schoolName, schoolType, schoolAddress, schoolPhone, academicYear, periodType, gradingWeights.
-
-    // We'll focus on School Details first. Academic Year/Periods are complex to change mid-year.
+    const isAdmin = ['PROVISEUR', 'CENSEUR', 'ADMIN', 'SUPER_ADMIN'].includes(user?.role);
 
     useEffect(() => {
-        const fetchEstablishment = async () => {
+        const fetchEstablishmentData = async () => {
             if (!user?.establishment_id) return;
             try {
-                const response = await api.get(`/establishments/${user.establishment_id}`);
-                setEstablishment(response.data);
+                const estResponse = await api.get(`/establishments/${user.establishment_id}`);
+                setEstablishment(estResponse.data);
                 setFormData({
-                    name: response.data.name || '',
-                    type: response.data.type || '',
-                    address: response.data.address || '',
-                    phone: response.data.phone || '',
-                    period_type: response.data.period_type || 'TRIMESTRE'
+                    name: estResponse.data.name || '',
+                    type: estResponse.data.type || '',
+                    address: estResponse.data.address || '',
+                    phone: estResponse.data.phone || '',
+                    period_type: estResponse.data.period_type || 'TRIMESTRE'
                 });
+
+                if (estResponse.data.active_academic_year) {
+                    const periodResponse = await api.get('/periods', {
+                        params: { academic_year_id: estResponse.data.active_academic_year.id }
+                    });
+                    setPeriods(periodResponse.data);
+                }
             } catch (error) {
                 console.error(error);
                 toast.error("Erreur chargement paramètres");
@@ -46,11 +46,25 @@ const Settings = ({ user }) => {
                 setLoading(false);
             }
         };
-        fetchEstablishment();
+        fetchEstablishmentData();
     }, [user]);
 
     const handleChange = (e) => {
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    };
+
+    const handleActivatePeriod = async (periodId) => {
+        try {
+            await api.post(`/periods/${periodId}/activate`);
+            toast.success("Semestre actif mis à jour");
+            // Refresh periods
+            const response = await api.get('/periods', {
+                params: { academic_year_id: establishment.active_academic_year.id }
+            });
+            setPeriods(response.data);
+        } catch (error) {
+            toast.error("Erreur lors de l'activation");
+        }
     };
 
     const handleSubmit = async () => {
@@ -180,11 +194,41 @@ const Settings = ({ user }) => {
                     <Card>
                         <div className="flex items-center gap-2 mb-4">
                             <School className="text-gray-400" />
-                            <h2 className="font-semibold text-gray-900">Année Scolaire</h2>
+                            <h2 className="font-semibold text-gray-900">Année & Période Scolaire</h2>
                         </div>
-                        <div className="py-2">
-                            <p className="text-sm text-gray-500">Année Active</p>
-                            <p className="font-bold text-lg text-green-600">{user?.establishment?.active_academic_year?.label || 'Non définie'}</p>
+                        <div className="space-y-4">
+                            <div>
+                                <p className="text-sm text-gray-500">Année Active</p>
+                                <p className="font-bold text-lg text-green-600">{establishment?.active_academic_year?.label || 'Non définie'}</p>
+                            </div>
+
+                            {isAdmin && (
+                                <div className="pt-2 border-t border-gray-100">
+                                    <p className="text-sm font-medium text-gray-700 mb-2">Choisir le Semestre Actif</p>
+                                    <div className="space-y-2">
+                                        {periods.map(period => (
+                                            <button
+                                                key={period.id}
+                                                onClick={() => handleActivatePeriod(period.id)}
+                                                className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${period.is_active
+                                                    ? 'bg-blue-50 border-blue-200 text-blue-700 font-bold'
+                                                    : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200'
+                                                    }`}
+                                            >
+                                                <span>{period.name}</span>
+                                                {period.is_active ? (
+                                                    <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full uppercase">Actif</span>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">Activer</span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 mt-3 italic">
+                                        * Seule la période active est modifiable par les enseignants.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </Card>
                 </div>

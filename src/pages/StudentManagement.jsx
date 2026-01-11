@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { GraduationCap, Search, Edit, Trash2, UserPlus, Filter, X } from 'lucide-react';
+import { GraduationCap, Search, Edit, Trash2, UserPlus, Filter, X, FileUp } from 'lucide-react';
 import { Card, Button, Input, Select, Badge, Modal } from '../components/ui';
 import api from '../lib/api';
 import { toast } from 'react-hot-toast';
 import { useLocation } from 'react-router-dom';
+import ImportModal from '../components/ImportModal';
 
 const StudentManagement = ({ user }) => {
     const location = useLocation();
@@ -20,6 +21,7 @@ const StudentManagement = ({ user }) => {
     const [editingStudent, setEditingStudent] = useState(null);
     const [studentToDelete, setStudentToDelete] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
     // Form State
     const initialFormState = {
@@ -194,9 +196,18 @@ const StudentManagement = ({ user }) => {
                             <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
                     </Select>
+                    <Button variant="outline" icon={FileUp} onClick={() => setIsImportModalOpen(true)}>Importer</Button>
                     <Button icon={UserPlus} onClick={handleOpenCreate}>Nouvel Élève</Button>
                 </div>
             </div>
+
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                type="students"
+                establishmentId={user?.establishment_id}
+                onSuccess={fetchStudents}
+            />
 
             <Card className="p-0 overflow-hidden">
                 <div className="p-6 border-b border-gray-100 bg-gray-50/50">
