@@ -103,27 +103,55 @@ const AdminDashboard = () => {
 
             {/* Stats Cards */}
             <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatsCard
-                    title="Total Students"
-                    value={stats.totalStudents}
-                    icon={GraduationCap}
-                    trend={stats.studentsTrend}
-                    trendLabel="vs last month"
-                />
-                <StatsCard
-                    title="Total Teachers"
-                    value={stats.totalTeachers}
-                    icon={Users}
-                    trend={stats.teachersTrend}
-                    trendLabel="vs last month"
-                />
-                <StatsCard
-                    title="Classes Managed"
-                    value={stats.classesManaged}
-                    icon={BookOpen}
-                    trend={0}
-                    trendLabel="vs last month"
-                />
+                <Card>
+                    <Card.Content className="p-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-gray-500">Total Students</p>
+                                <p className="text-3xl font-bold text-gray-900 mt-2">{stats.totalStudents}</p>
+                                {stats.studentsTrend !== 0 && (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {stats.studentsTrend > 0 ? '+' : ''}{stats.studentsTrend}% vs last month
+                                    </p>
+                                )}
+                            </div>
+                            <div className="p-3 bg-blue-50 rounded-lg">
+                                <GraduationCap className="w-6 h-6 text-blue-600" />
+                            </div>
+                        </div>
+                    </Card.Content>
+                </Card>
+                <Card>
+                    <Card.Content className="p-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-gray-500">Total Teachers</p>
+                                <p className="text-3xl font-bold text-gray-900 mt-2">{stats.totalTeachers}</p>
+                                {stats.teachersTrend !== 0 && (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {stats.teachersTrend > 0 ? '+' : ''}{stats.teachersTrend}% vs last month
+                                    </p>
+                                )}
+                            </div>
+                            <div className="p-3 bg-purple-50 rounded-lg">
+                                <Users className="w-6 h-6 text-purple-600" />
+                            </div>
+                        </div>
+                    </Card.Content>
+                </Card>
+                <Card>
+                    <Card.Content className="p-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-gray-500">Classes Managed</p>
+                                <p className="text-3xl font-bold text-gray-900 mt-2">{stats.classesManaged}</p>
+                            </div>
+                            <div className="p-3 bg-green-50 rounded-lg">
+                                <BookOpen className="w-6 h-6 text-green-600" />
+                            </div>
+                        </div>
+                    </Card.Content>
+                </Card>
             </motion.div>
 
             {/* Security Monitor & Grade Submissions */}

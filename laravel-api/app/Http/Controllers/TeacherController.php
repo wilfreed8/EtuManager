@@ -22,20 +22,31 @@ class TeacherController extends Controller
             ->with(['schoolClass', 'subject', 'academicYear'])
             ->get()
             ->map(function ($assignment) {
-                // Get student count for this class
-                $studentCount = Student::whereHas('enrollments', function ($q) use ($assignment) {
-                    $q->where('class_id', $assignment->class_id)
-                      ->where('academic_year_id', $assignment->academic_year_id);
+                // Determine the academic year to use
+                $academicYearId = $assignment->academic_year_id;
+                if (!$academicYearId) {
+                    $activeYear = \App\Models\AcademicYear::where('is_active', true)->first();
+                    $academicYearId = $activeYear ? $activeYear->id : null;
+                }
+
+                // Get student count for this class in the specific academic year
+                $studentCount = Student::whereHas('enrollments', function ($q) use ($assignment, $academicYearId) {
+                    $q->where('class_id', $assignment->class_id);
+                    if ($academicYearId) {
+                        $q->where('academic_year_id', $academicYearId);
+                    }
                 })->count();
 
                 // Get grading progress (students with at least one grade in this subject)
-                $studentsWithGrades = Grade::where('subject_id', $assignment->subject_id)
-                    ->whereHas('student.enrollments', function ($q) use ($assignment) {
-                        $q->where('class_id', $assignment->class_id)
-                          ->where('academic_year_id', $assignment->academic_year_id);
-                    })
-                    ->distinct('student_id')
-                    ->count('student_id');
+                $studentsWithGradesQuery = Grade::where('subject_id', $assignment->subject_id)
+                    ->whereHas('student.enrollments', function ($q) use ($assignment, $academicYearId) {
+                        $q->where('class_id', $assignment->class_id);
+                        if ($academicYearId) {
+                            $q->where('academic_year_id', $academicYearId);
+                        }
+                    });
+                
+                $studentsWithGrades = $studentsWithGradesQuery->distinct('student_id')->count('student_id');
 
                 $gradingProgress = $studentCount > 0 
                     ? round(($studentsWithGrades / $studentCount) * 100) 

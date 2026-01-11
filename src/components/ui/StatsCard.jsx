@@ -1,71 +1,49 @@
-import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import React from 'react';
 
-const StatsCard = ({
-    title,
-    value,
-    icon: Icon,
-    trend,
-    trendLabel,
-    variant = 'default',
-    className = ''
-}) => {
-    const variants = {
-        default: 'bg-white',
-        primary: 'bg-gradient-to-br from-blue-500 to-blue-600 text-white',
-        success: 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white',
-        warning: 'bg-gradient-to-br from-amber-500 to-amber-600 text-white',
-    };
-
-    const isPositive = trend > 0;
-    const isNegative = trend < 0;
-    const TrendIcon = isPositive ? TrendingUp : isNegative ? TrendingDown : Minus;
+const StatCard = ({ label, value, unit, subtext, icon, type }) => {
+    if (type === 'highlight') {
+        return (
+            <div className="relative overflow-hidden bg-blue-600 rounded-3xl p-8 text-white shadow-xl shadow-blue-100 flex flex-col justify-between group h-52">
+                <div className="relative z-10 flex justify-between items-start">
+                    <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
+                        {icon}
+                    </div>
+                    <span className="text-white/70 text-sm font-semibold uppercase tracking-wider">{label}</span>
+                </div>
+                <div className="relative z-10">
+                    <div className="flex items-baseline gap-1">
+                        <span className="text-5xl font-black">{value}</span>
+                        {unit && <span className="text-xl font-bold opacity-80">{unit}</span>}
+                    </div>
+                    <p className="text-white/80 mt-1 font-medium">{subtext}</p>
+                </div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-500"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2 group-hover:scale-110 transition-transform duration-500 delay-75"></div>
+            </div>
+        );
+    }
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`
-        rounded-xl border border-gray-200 p-6 shadow-sm
-        ${variants[variant]}
-        ${className}
-      `}
-        >
-            <div className="flex items-start justify-between">
-                <div>
-                    <p className={`text-sm font-medium ${variant === 'default' ? 'text-gray-500' : 'text-white/80'}`}>
-                        {title}
-                    </p>
-                    <motion.p
-                        className={`mt-2 text-3xl font-bold ${variant === 'default' ? 'text-gray-900' : 'text-white'}`}
-                        initial={{ scale: 0.5 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
-                    >
-                        {typeof value === 'number' ? value.toLocaleString() : value}
-                    </motion.p>
-
-                    {trend !== undefined && (
-                        <div className={`mt-2 flex items-center gap-1 text-sm ${variant === 'default'
-                                ? isPositive ? 'text-emerald-600' : isNegative ? 'text-red-600' : 'text-gray-500'
-                                : 'text-white/80'
-                            }`}>
-                            <TrendIcon className="w-4 h-4" />
-                            <span>{isPositive ? '+' : ''}{trend}%</span>
-                            {trendLabel && <span className="text-gray-400 ml-1">{trendLabel}</span>}
-                        </div>
+        <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm flex flex-col justify-between h-52 group hover:shadow-md transition-shadow">
+            <div className="flex justify-between items-start">
+                <div className={`p-2.5 rounded-xl ${type === 'alert' ? 'bg-orange-50' : 'bg-blue-50'}`}>
+                    {icon}
+                </div>
+                <span className="text-slate-400 text-sm font-semibold uppercase tracking-wider">{label}</span>
+            </div>
+            <div>
+                <div className="flex items-center gap-3">
+                    <span className="text-5xl font-extrabold text-slate-900 tracking-tight">{value}</span>
+                    {type === 'alert' && (
+                        <span className="bg-orange-50 text-orange-600 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wide">
+                            {subtext}
+                        </span>
                     )}
                 </div>
-
-                {Icon && (
-                    <div className={`p-3 rounded-lg ${variant === 'default' ? 'bg-blue-50' : 'bg-white/20'
-                        }`}>
-                        <Icon className={`w-6 h-6 ${variant === 'default' ? 'text-blue-600' : 'text-white'}`} />
-                    </div>
-                )}
+                {type !== 'alert' && <p className="text-slate-400 mt-1 font-medium">{subtext}</p>}
             </div>
-        </motion.div>
+        </div>
     );
 };
 
-export default StatsCard;
+export default StatCard;
