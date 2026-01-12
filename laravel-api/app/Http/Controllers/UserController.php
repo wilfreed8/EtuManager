@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Role;
+use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
@@ -27,6 +29,63 @@ class UserController extends Controller
         return $query->get();
     }
 
+    /**
+     * Get teachers with their last login information
+     */
+    public function getTeachersWithAudit(Request $request)
+    {
+        $establishmentId = $request->user()->establishment_id;
+
+        // Get active/selected year
+        $activeYear = $request->user()->establishment->selected_academic_year_id 
+            ? $request->user()->establishment->selectedAcademicYear 
+            : $request->user()->establishment->activeAcademicYear;
+        $activeYearId = $activeYear ? $activeYear->id : null;
+
+        $teachers = User::where('establishment_id', $establishmentId)
+            ->whereHas('roles', function($q) {
+                $q->where('name', 'ENSEIGNANT');
+            })
+            ->with(['roles', 'teacherAssignments' => function($q) use ($activeYearId) {
+                if ($activeYearId) {
+                    $q->where('academic_year_id', $activeYearId);
+                } else {
+                    $q->where('id', '00000000-0000-0000-0000-000000000000'); // No context = no assignments
+                }
+                $q->with(['subject', 'schoolClass']);
+            }])
+            ->get()
+            ->map(function ($teacher) use ($activeYearId) {
+                // Get last login from audit logs
+                $lastLogin = AuditLog::where('user_id', $teacher->id)
+                    ->where('action', 'login')
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                return [
+                    'id' => $teacher->id,
+                    'name' => $teacher->name ?? 'Enseignant Sans Nom', 
+                    'email' => $teacher->email,
+                    'phone' => $teacher->phone,
+                    'address' => $teacher->address,
+                    'role' => $teacher->role,
+                    'teacher_assignments' => $teacher->teacherAssignments->map(function($a) {
+                        return [
+                            'id' => $a->id,
+                            'subject' => ['name' => $a->subject->name ?? 'N/A'],
+                            'school_class' => ['name' => $a->schoolClass->name ?? 'N/A'],
+                        ];
+                    }),
+                    'last_login' => $lastLogin ? [
+                        'date' => $lastLogin->created_at,
+                        'ip' => $lastLogin->ip_address,
+                    ] : null,
+                ];
+            });
+
+        return response()->json($teachers->values()); // Ensure it's a JSON array
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -44,9 +103,17 @@ class UserController extends Controller
         $user = User::create($validated);
 
         if ($request->has('role')) {
-            $role = Role::where('name', $request->role)->first();
+            $roleName = $request->role;
+            // Ensure consistency in role naming
+            if ($roleName === 'ENSEIGNANT') {
+                $role = Role::firstOrCreate(['name' => 'ENSEIGNANT']);
+            } else {
+                $role = Role::where('name', $roleName)->first();
+            }
+            
             if ($role) {
-                $user->roles()->attach($role->id, ['establishment_id' => $validated['establishment_id']]);
+                // Check if already attached to avoid duplicates (though user is new here)
+                $user->roles()->syncWithoutDetaching([$role->id => ['establishment_id' => $validated['establishment_id']]]);
             }
         }
 
@@ -95,14 +162,18 @@ class UserController extends Controller
             }
 
             $count = 0;
-            $role = Role::where('name', 'ENSEIGNANT')->first();
+            $skipped = 0;
+            $role = Role::firstOrCreate(['name' => 'ENSEIGNANT']);
 
             foreach ($rows as $row) {
                 // first_name, last_name, email, phone, address, specialite
                 if (!isset($row[2])) continue;
 
                 $email = $row[2];
-                if (User::where('email', $email)->exists()) continue;
+                if (User::where('email', $email)->exists()) {
+                    $skipped++;
+                    continue;
+                }
 
                 $user = User::create([
                     'name' => $row[0] . ' ' . $row[1],
@@ -114,12 +185,12 @@ class UserController extends Controller
                 ]);
 
                 if ($role) {
-                    $user->roles()->attach($role->id, ['establishment_id' => $request->establishment_id]);
+                    $user->roles()->syncWithoutDetaching([$role->id => ['establishment_id' => $request->establishment_id]]);
                 }
                 $count++;
             }
 
-            return response()->json(['message' => "$count enseignants importés"]);
+            return response()->json(['message' => "$count enseignants importés. $skipped ignorés (email existant)."]);
         } catch (\Exception $e) {
              return response()->json(['message' => "Erreur import: " . $e->getMessage()], 500);
         }

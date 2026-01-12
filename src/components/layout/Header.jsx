@@ -6,18 +6,36 @@ import api from '../../lib/api';
 const Header = ({ user }) => {
     const location = useLocation();
     const [activePeriod, setActivePeriod] = useState(null);
+    const [currentYearLabel, setCurrentYearLabel] = useState('');
 
     useEffect(() => {
-        const fetchActivePeriod = async () => {
+        const fetchData = async () => {
+            if (!user?.establishment) return;
+
+            // Determine effective year ID
+            const yearId = user.establishment.selected_academic_year_id || user.establishment.active_academic_year?.id;
+
+            // Set Year Label
+            if (user.establishment.selected_academic_year_id && user.establishment.selected_academic_year) {
+                setCurrentYearLabel(user.establishment.selected_academic_year.label);
+            } else if (user.establishment.active_academic_year) {
+                setCurrentYearLabel(user.establishment.active_academic_year.label);
+            }
+
+            if (!yearId) return;
+
             try {
-                const response = await api.get('/active-period');
-                setActivePeriod(response.data);
+                // Fetch periods for this year to find the active one
+                const response = await api.get('/periods', { params: { academic_year_id: yearId } });
+                const periods = response.data;
+                const active = periods.find(p => p.is_active);
+                setActivePeriod(active || periods[0]); // Default to first if none active (or null)
             } catch (err) {
-                console.error("Error fetching active period", err);
+                console.error("Error fetching header info", err);
             }
         };
-        fetchActivePeriod();
-    }, []);
+        fetchData();
+    }, [user, user?.establishment?.selected_academic_year_id]);
 
     // Generate breadcrumbs from path
     const getBreadcrumbs = () => {
@@ -73,6 +91,13 @@ const Header = ({ user }) => {
                         </div>
                     ))}
                 </nav>
+
+                {currentYearLabel && (
+                    <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-xs font-bold">
+                        <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                        {currentYearLabel}
+                    </div>
+                )}
 
                 {activePeriod && (
                     <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-xs font-bold">

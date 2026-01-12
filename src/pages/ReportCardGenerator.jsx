@@ -21,32 +21,32 @@ const ReportCardGenerator = ({ user }) => {
     const [downloadingBulk, setDownloadingBulk] = useState(false);
     const [downloadFormat, setDownloadFormat] = useState('pdf'); // 'pdf' or 'docx' or 'html'
 
-    // Fetch classes and periods
+    // Fetch classes and active period
     useEffect(() => {
         const init = async () => {
             if (!user?.establishment_id) return;
             try {
-                const activeYearId = user.establishment?.active_academic_year?.id;
+                const activeYearId = user?.establishment?.selected_academic_year_id || user?.establishment?.active_academic_year?.id;
 
-                const [classRes, periodRes] = await Promise.all([
+                const [classRes, activePeriodRes] = await Promise.all([
                     api.get('/classes', {
                         params: {
                             establishment_id: user.establishment_id,
                             academic_year_id: activeYearId
                         }
                     }),
-                    api.get('/periods', {
-                        params: {
-                            academic_year_id: activeYearId
-                        }
-                    })
+                    api.get('/active-period')
                 ]);
 
                 setClasses(classRes.data);
                 if (classRes.data.length > 0) setSelectedClass(classRes.data[0].id);
 
-                setPeriods(periodRes.data);
-                if (periodRes.data.length > 0) setSelectedPeriod(periodRes.data[0].id);
+                if (activePeriodRes.data) {
+                    setPeriods([activePeriodRes.data]); // Set as single option
+                    setSelectedPeriod(activePeriodRes.data.id);
+                } else {
+                    setPeriods([]);
+                }
 
             } catch (err) {
                 console.error(err);
@@ -204,14 +204,12 @@ const ReportCardGenerator = ({ user }) => {
                         {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </Select>
 
-                    <Select
-                        label="Période"
-                        value={selectedPeriod}
-                        onChange={(e) => setSelectedPeriod(e.target.value)}
-                    >
-                        <option value="">Sélectionner une période</option>
-                        {periods.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </Select>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium text-gray-700">Période Active</label>
+                        <div className="h-10 px-3 bg-gray-50 border border-gray-200 rounded-md flex items-center text-sm text-gray-500 cursor-not-allowed">
+                            {periods[0]?.name || 'Chargement...'}
+                        </div>
+                    </div>
 
                     <div className="md:col-span-1">
                         <Select

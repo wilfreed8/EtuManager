@@ -18,13 +18,32 @@ class BulletinController extends Controller
      */
     public function generate(Request $request, Student $student, Period $period)
     {
-        $bulletinData = $this->prepareBulletinData($student, $period);
-        
-        if (isset($bulletinData['error'])) {
-            return response()->json($bulletinData, 404);
-        }
+        try {
+            $bulletinData = $this->prepareBulletinData($student, $period);
+            
+            if (isset($bulletinData['error'])) {
+                return response()->json($bulletinData, 404);
+            }
 
-        return view('bulletin', $bulletinData);
+            $template = $student->establishment->bulletin_template ?? 'template1';
+            $viewName = 'bulletins.' . $template;
+            
+            if (!view()->exists($viewName)) {
+                $viewName = 'bulletins.template1';
+            }
+
+            if ($request->query('format') === 'pdf') {
+                 $pdf = app('dompdf.wrapper');
+                 $pdf->loadView($viewName, $bulletinData);
+                 $pdf->setPaper('a4', 'portrait');
+                 return $pdf->download('Bulletin_' . $student->last_name . '.pdf');
+            }
+
+            return view($viewName, $bulletinData);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Bulletin gen error: " . $e->getMessage());
+            return response()->json(['error' => 'Erreur génération PDF: ' . $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -52,23 +71,42 @@ class BulletinController extends Controller
         $zip = new ZipArchive;
         if ($zip->open($zipPath, ZipArchive::CREATE) === TRUE) {
             foreach ($enrollments as $enrollment) {
-                $student = $enrollment->student;
-                $data = $this->prepareBulletinData($student, $period);
-                if (isset($data['error'])) continue;
+                try {
+                    $student = $enrollment->student;
+                    $data = $this->prepareBulletinData($student, $period);
+                    
+                    if (isset($data['error'])) {
+                        \Illuminate\Support\Facades\Log::warning("Bulletin data error for student {$student->id}: " . $data['error']);
+                        continue;
+                    }
 
-                $filenameBase = str_replace(' ', '_', $student->last_name . '_' . $student->first_name);
+                    $filenameBase = str_replace(' ', '_', $student->last_name . '_' . $student->first_name);
+                    $template = $student->establishment->bulletin_template ?? 'template1';
+                    $viewName = 'bulletins.' . $template;
+                    
+                    if (!view()->exists($viewName)) {
+                        \Illuminate\Support\Facades\Log::warning("View $viewName not found, falling back to template1");
+                        $viewName = 'bulletins.template1';
+                    }
 
-                if ($format === 'pdf' && class_exists('Barryvdh\DomPDF\Facade\Pdf')) {
-                    $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('bulletin', $data);
-                    $zip->addFromString($filenameBase . '.pdf', $pdf->output());
-                } else {
-                    $html = view('bulletin', $data)->render();
-                    $zip->addFromString($filenameBase . '.html', $html);
+                    if ($format === 'pdf') {
+                        // Ensure DOMPDF is loaded
+                         $pdf = app('dompdf.wrapper');
+                         $pdf->loadView($viewName, $data);
+                         $pdf->setPaper('a4', 'portrait');
+                         $zip->addFromString($filenameBase . '.pdf', $pdf->output());
+                    } else {
+                        $html = view($viewName, $data)->render();
+                        $zip->addFromString($filenameBase . '.html', $html);
+                    }
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Error generating bulletin for user {$enrollment->student_id}: " . $e->getMessage() . "\n" . $e->getTraceAsString());
+                    continue; // Skip this student but continue others
                 }
             }
             $zip->close();
         } else {
-            return response()->json(['error' => 'Could not create ZIP'], 500);
+            return response()->json(['error' => 'Could not create ZIP archive'], 500);
         }
 
         return response()->download($zipPath)->deleteFileAfterSend(true);
@@ -100,7 +138,8 @@ class BulletinController extends Controller
         $subjectsByCategory = $this->groupSubjectsByCategory($grades);
         
         // Calculate report data
-        $report = $this->calculateReport($grades);
+        // Calculate report data
+        $report = $this->calculateReport($grades, $class->id);
         
         // Get class statistics
         $classStats = $this->calculateClassStats($class->id, $period->id);
@@ -162,17 +201,40 @@ class BulletinController extends Controller
     }
 
     /**
+     * Get coefficient for a subject in a specific class
+     */
+    private function getSubjectCoefficient($subject, $classId)
+    {
+        if (!$subject || !$classId) return 1;
+
+        // Try to find specific coefficient for this class
+        $classSubject = \Illuminate\Support\Facades\DB::table('class_subjects')
+            ->where('class_id', $classId)
+            ->where('subject_id', $subject->id)
+            ->first();
+            
+        return $classSubject ? $classSubject->coefficient : ($subject->coefficient ?? 1);
+    }
+
+    /**
      * Calculate report data from grades
      */
-    private function calculateReport($grades)
+    private function calculateReport($grades, $classId)
     {
-        return $grades->map(function ($grade) {
+        if ($grades->isEmpty()) return collect([]);
+        
+        return $grades->map(function ($grade) use ($classId) {
             $avg = $this->calculateSubjectAverage($grade);
+            $coeff = $this->getSubjectCoefficient($grade->subject, $classId);
             
             // Get teacher name from assignment
             $teacherName = 'N/A';
             if ($grade->subject && $grade->subject->teacherAssignments->isNotEmpty()) {
-                $assignment = $grade->subject->teacherAssignments->first();
+                // Filter assignments for THIS class
+                $assignment = $grade->subject->teacherAssignments
+                    ->where('class_id', $classId)
+                    ->first();
+                    
                 if ($assignment && $assignment->teacher) {
                     $teacherName = $assignment->teacher->name;
                 }
@@ -181,12 +243,12 @@ class BulletinController extends Controller
             return [
                 'subject' => $grade->subject->name ?? 'N/A',
                 'subject_code' => $grade->subject->code ?? '',
-                'coefficient' => $grade->subject->coefficient ?? 1,
+                'coefficient' => $coeff,
                 'interro' => $grade->interro_avg,
                 'devoir' => $grade->devoir_avg,
                 'compo' => $grade->compo_grade,
                 'average' => $avg,
-                'weighted_average' => $avg * ($grade->subject->coefficient ?? 1),
+                'weighted_average' => $avg * $coeff,
                 'teacher' => $teacherName,
                 'appreciation' => $this->getAppreciation($avg),
             ];
@@ -228,7 +290,7 @@ class BulletinController extends Controller
             ->where('academic_year_id', $period->academic_year_id)
             ->get();
 
-        return $enrollments->map(function ($enrollment) use ($periodId) {
+        return $enrollments->map(function ($enrollment) use ($periodId, $classId) {
             $grades = Grade::where('student_id', $enrollment->student_id)
                 ->where('period_id', $periodId)
                 ->with('subject')
@@ -241,7 +303,7 @@ class BulletinController extends Controller
             
             foreach ($grades as $grade) {
                 $avg = $this->calculateSubjectAverage($grade);
-                $coeff = $grade->subject->coefficient ?? 1;
+                $coeff = $this->getSubjectCoefficient($grade->subject, $classId);
                 $totalPoints += $avg * $coeff;
                 $totalCoeff += $coeff;
             }
@@ -271,7 +333,7 @@ class BulletinController extends Controller
         
         foreach ($studentGrades as $grade) {
             $avg = $this->calculateSubjectAverage($grade);
-            $coeff = $grade->subject->coefficient ?? 1;
+            $coeff = $this->getSubjectCoefficient($grade->subject, $classId);
             $totalPoints += $avg * $coeff;
             $totalCoeff += $coeff;
         }
@@ -317,11 +379,17 @@ class BulletinController extends Controller
                 ];
             }
 
+            // Find enrollment for that period's year
+            $prevEnrollment = StudentEnrollment::where('student_id', $student->id)
+                ->where('academic_year_id', $period->academic_year_id)
+                ->first();
+            $prevClassId = $prevEnrollment ? $prevEnrollment->class_id : null;
+
             $totalCoeff = 0;
             $totalPoints = 0;
             foreach ($grades as $grade) {
                 $avg = $this->calculateSubjectAverage($grade);
-                $coeff = $grade->subject->coefficient ?? 1;
+                $coeff = $prevClassId ? $this->getSubjectCoefficient($grade->subject, $prevClassId) : ($grade->subject->coefficient ?? 1);
                 $totalPoints += $avg * $coeff;
                 $totalCoeff += $coeff;
             }

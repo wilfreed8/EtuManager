@@ -43,7 +43,7 @@ const StudentManagement = ({ user }) => {
             const response = await api.get('/classes', {
                 params: {
                     establishment_id: user?.establishment_id,
-                    academic_year_id: user?.establishment?.active_academic_year?.id
+                    academic_year_id: user?.establishment?.selected_academic_year_id || user?.establishment?.active_academic_year?.id
                 }
             });
             setClasses(response.data);

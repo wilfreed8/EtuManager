@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Modal, Button } from './ui';
-import { Upload, FileUp, Download } from 'lucide-react';
+import { Upload, FileUp, Download, AlertCircle } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -50,10 +50,13 @@ const ImportModal = ({ isOpen, onClose, type, onSuccess, establishmentId }) => {
         document.body.removeChild(a);
     };
 
+    const [errors, setErrors] = useState([]);
+
     const handleUpload = async () => {
         if (!file) return toast.error("Veuillez sélectionner un fichier");
 
         setUploading(true);
+        setErrors([]); // Clear previous errors
         const formData = new FormData();
         formData.append('file', file);
         formData.append('establishment_id', establishmentId);
@@ -68,10 +71,16 @@ const ImportModal = ({ isOpen, onClose, type, onSuccess, establishmentId }) => {
             onClose();
         } catch (error) {
             console.error(error);
-            toast.error(error.response?.data?.message || "Erreur lors de l'importation");
+            if (error.response?.status === 422 && error.response?.data?.errors) {
+                setErrors(error.response.data.errors);
+                toast.error("Le fichier contient des erreurs de validation");
+            } else {
+                toast.error(error.response?.data?.message || "Erreur lors de l'importation");
+            }
         } finally {
             setUploading(false);
-            setFile(null);
+            if (errors.length === 0) setFile(null); // Keep file if errors so user can retry/see errors? Actually better to keep file only if we want them to re-upload. Ideally keep UI state.
+            // But here we rely on file input.
         }
     };
 
@@ -128,6 +137,24 @@ const ImportModal = ({ isOpen, onClose, type, onSuccess, establishmentId }) => {
                         onChange={handleFileChange}
                     />
                 </div>
+
+                {/* Validation Errors Display */}
+                {errors.length > 0 && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-h-60 overflow-y-auto">
+                        <div className="flex items-center gap-2 mb-2 text-red-800 font-semibold">
+                            <AlertCircle className="w-5 h-5" />
+                            <span>Échecs de validation ({errors.length})</span>
+                        </div>
+                        <ul className="list-disc list-inside space-y-1 text-sm text-red-700">
+                            {errors.map((err, idx) => (
+                                <li key={idx}>{err}</li>
+                            ))}
+                        </ul>
+                        <p className="text-xs text-red-600 mt-2 font-medium">
+                            Veuillez corriger votre fichier Excel et réessayer. Aucun élève n'a été importé.
+                        </p>
+                    </div>
+                )}
 
                 <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100 mt-2">
                     <button

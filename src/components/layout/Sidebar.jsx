@@ -9,7 +9,8 @@ import {
     Settings,
     LogOut,
     Building2,
-    Shield
+    Shield,
+    LayoutGrid
 } from 'lucide-react';
 
 const Sidebar = ({ user, onLogout }) => {
@@ -29,12 +30,13 @@ const Sidebar = ({ user, onLogout }) => {
             ];
         }
 
-        if (role === 'PROVISEUR' || role === 'CENSEUR') {
+        if (role === 'PROVISEUR' || role === 'CENSEUR' || role === 'ADMIN') {
             return [
                 { icon: LayoutDashboard, label: 'Tableau de bord', path: '/dashboard' },
                 { icon: GraduationCap, label: 'Élèves', path: '/students' },
-                { icon: Users, label: 'Enseignants', path: '/teachers' },
-                { icon: BookOpen, label: 'Classes', path: '/classes' },
+                { icon: Users, label: 'Utilisateurs', path: '/teachers' },
+                { icon: LayoutGrid, label: 'Classes', path: '/classes' },
+                { icon: BookOpen, label: 'Matières', path: '/subjects' },
                 { icon: FileText, label: 'Bulletins', path: '/reports' },
                 { icon: Settings, label: 'Paramètres', path: '/settings' },
             ];
@@ -44,7 +46,7 @@ const Sidebar = ({ user, onLogout }) => {
             return [
                 { icon: LayoutDashboard, label: 'Tableau de bord', path: '/dashboard' },
                 { icon: GraduationCap, label: 'Élèves', path: '/students' },
-                { icon: BookOpen, label: 'Classes', path: '/classes' },
+                { icon: LayoutGrid, label: 'Classes', path: '/classes' },
             ];
         }
 

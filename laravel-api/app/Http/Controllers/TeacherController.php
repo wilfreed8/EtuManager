@@ -16,34 +16,37 @@ class TeacherController extends Controller
      */
     public function myAssignments(Request $request)
     {
-        $userId = $request->user_id ?? Auth::id();
+        $user = $request->user();
+        $userId = $request->user_id ?? $user->id;
+        
+        // Priority: Selected Year > Active Year
+        $est = $user->establishment;
+        $activeYear = $est->selected_academic_year_id 
+            ? $est->selectedAcademicYear 
+            : $est->activeAcademicYear;
+        
+        if (!$activeYear) {
+            return response()->json(['message' => 'Aucune année académique active.'], 400);
+        }
+
+        $academicYearId = $activeYear->id;
         
         $assignments = TeacherAssignment::where('user_id', $userId)
+            ->where('academic_year_id', $academicYearId)
             ->with(['schoolClass', 'subject', 'academicYear'])
             ->get()
-            ->map(function ($assignment) {
-                // Determine the academic year to use
-                $academicYearId = $assignment->academic_year_id;
-                if (!$academicYearId) {
-                    $activeYear = \App\Models\AcademicYear::where('is_active', true)->first();
-                    $academicYearId = $activeYear ? $activeYear->id : null;
-                }
-
+            ->map(function ($assignment) use ($academicYearId) {
                 // Get student count for this class in the specific academic year
                 $studentCount = Student::whereHas('enrollments', function ($q) use ($assignment, $academicYearId) {
                     $q->where('class_id', $assignment->class_id);
-                    if ($academicYearId) {
-                        $q->where('academic_year_id', $academicYearId);
-                    }
+                    $q->where('academic_year_id', $academicYearId);
                 })->count();
 
                 // Get grading progress (students with at least one grade in this subject)
                 $studentsWithGradesQuery = Grade::where('subject_id', $assignment->subject_id)
                     ->whereHas('student.enrollments', function ($q) use ($assignment, $academicYearId) {
                         $q->where('class_id', $assignment->class_id);
-                        if ($academicYearId) {
-                            $q->where('academic_year_id', $academicYearId);
-                        }
+                        $q->where('academic_year_id', $academicYearId);
                     });
                 
                 $studentsWithGrades = $studentsWithGradesQuery->distinct('student_id')->count('student_id');

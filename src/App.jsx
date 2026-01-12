@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { MainLayout } from './components/layout';
+import api from './lib/api';
 import { Toaster } from 'react-hot-toast';
 import {
   Landing,
@@ -16,7 +17,8 @@ import {
   GradeEntry,
   ReportCardGenerator,
   SuperAdminDashboard,
-  Settings
+  Settings,
+  SubjectManagement
 } from './pages';
 import './index.css';
 
@@ -40,11 +42,21 @@ function App() {
       return <SuperAdminDashboard user={user} />;
     }
 
-    if (['PROVISEUR', 'CENSEUR', 'SECRETAIRE'].includes(user.role)) {
+    if (['PROVISEUR', 'CENSEUR', 'SECRETAIRE', 'ADMIN'].includes(user.role)) {
       return <AdminDashboard user={user} />;
     }
 
     return <TeacherDashboard user={user} />;
+  };
+
+  // Function to refresh user data (e.g., after changing settings)
+  const refreshUser = async () => {
+    try {
+      const response = await api.get('/me');
+      setUser(response.data);
+    } catch (err) {
+      console.error("Failed to refresh user data", err);
+    }
   };
 
   return (
@@ -86,8 +98,9 @@ function App() {
             <Route path="classes" element={<ClassManagement user={user} />} />
             <Route path="my-classes" element={<TeacherDashboard user={user} />} />
             <Route path="grades" element={<GradeEntry user={user} />} />
+            <Route path="subjects" element={<SubjectManagement user={user} />} />
             <Route path="reports" element={<ReportCardGenerator user={user} />} />
-            <Route path="settings" element={<Settings user={user} />} />
+            <Route path="settings" element={<Settings user={user} onUpdateUser={refreshUser} />} />
 
             {/* Super Admin Routes */}
             <Route path="super-admin" element={<SuperAdminDashboard />} />

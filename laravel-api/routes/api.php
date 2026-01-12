@@ -13,25 +13,44 @@ use App\Http\Controllers\EstablishmentController;
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+    Route::post('/verify-password', [AuthController::class, 'verifyPassword']);
     
     Route::apiResource('users', \App\Http\Controllers\UserController::class);
+    Route::get('/users-with-audit', [\App\Http\Controllers\UserController::class, 'getTeachersWithAudit']);
     Route::apiResource('establishments', EstablishmentController::class);
+    Route::post('/establishments/{id}/logo', [EstablishmentController::class, 'uploadLogo']);
     Route::apiResource('academic-years', \App\Http\Controllers\AcademicYearController::class);
     Route::apiResource('periods', \App\Http\Controllers\PeriodController::class);
     Route::post('/periods/{period}/activate', [\App\Http\Controllers\PeriodController::class, 'activate']);
     Route::get('/active-period', [\App\Http\Controllers\PeriodController::class, 'getActive']);
+    
+    // Academic year selection
+    Route::post('/academic-years/{year}/select', [\App\Http\Controllers\AcademicYearController::class, 'select']);
+    Route::post('/academic-years/{year}/activate', [\App\Http\Controllers\AcademicYearController::class, 'activate']);
     Route::apiResource('classes', \App\Http\Controllers\SchoolClassController::class)->parameters(['classes' => 'schoolClass']);
     Route::apiResource('students', \App\Http\Controllers\StudentController::class);
     Route::apiResource('enrollments', \App\Http\Controllers\StudentEnrollmentController::class)->only(['store', 'destroy']);
     Route::apiResource('teacher-assignments', \App\Http\Controllers\TeacherAssignmentController::class)->except(['update', 'show']); // Often just add/remove
     Route::apiResource('grades', \App\Http\Controllers\GradeController::class)->only(['index', 'store']);
     Route::apiResource('subjects', \App\Http\Controllers\SubjectController::class);
+    Route::post('/subjects/import', [\App\Http\Controllers\SubjectController::class, 'import']);
+    
+    // Class Configuration
+    Route::get('/classes/{classId}/subjects', [\App\Http\Controllers\SubjectController::class, 'getClassConfig']);
+    Route::post('/classes/{classId}/subjects', [\App\Http\Controllers\SubjectController::class, 'updateClassConfig']);
     
     // Import
     Route::post('/students/import', [\App\Http\Controllers\StudentController::class, 'import']);
     Route::post('/users/import', [\App\Http\Controllers\UserController::class, 'import']);
     
     Route::get('/stats', [\App\Http\Controllers\DashboardController::class, 'stats']);
+    
+    // Admin messages
+    Route::get('/admin-messages', [\App\Http\Controllers\AdminMessageController::class, 'index']);
+    Route::get('/admin-messages/all', [\App\Http\Controllers\AdminMessageController::class, 'all']);
+    Route::post('/admin-messages', [\App\Http\Controllers\AdminMessageController::class, 'store']);
+    Route::put('/admin-messages/{id}', [\App\Http\Controllers\AdminMessageController::class, 'update']);
+    Route::delete('/admin-messages/{id}', [\App\Http\Controllers\AdminMessageController::class, 'destroy']);
     
     // Teacher routes
     Route::get('/teachers/my-assignments', [TeacherController::class, 'myAssignments']);

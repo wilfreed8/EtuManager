@@ -27,7 +27,7 @@ const StudentRegistration = ({ user }) => {
                 const response = await api.get('/classes', {
                     params: {
                         establishment_id: user?.establishment_id,
-                        academic_year_id: user?.establishment?.active_academic_year?.id
+                        academic_year_id: user?.establishment?.selected_academic_year_id || user?.establishment?.active_academic_year?.id
                     }
                 });
                 setClasses(response.data);
@@ -37,9 +37,9 @@ const StudentRegistration = ({ user }) => {
             }
         };
         fetchClasses();
-    }, []);
+    }, [user?.establishment?.selected_academic_year_id]);
 
-    const activeYear = user?.establishment?.active_academic_year;
+    const activeYear = user?.establishment?.selected_academic_year || user?.establishment?.active_academic_year;
 
     const [formData, setFormData] = useState({
         firstName: '',

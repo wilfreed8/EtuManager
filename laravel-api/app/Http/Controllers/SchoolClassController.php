@@ -9,25 +9,52 @@ class SchoolClassController extends Controller
 {
     public function index(Request $request)
     {
+        $user = $request->user();
+        $establishmentId = $user->establishment_id;
+        
+        // Priority: Request > Selected Year > Active Year
+        $est = $user->establishment;
+        $activeYear = $est->selected_academic_year_id 
+            ? $est->selectedAcademicYear 
+            : $est->activeAcademicYear;
+
+        $academicYearId = $request->academic_year_id ?? ($activeYear ? $activeYear->id : null);
+
         $query = SchoolClass::query()->withCount('students');
-        if ($request->has('academic_year_id')) {
-            $query->where('academic_year_id', $request->academic_year_id);
+        
+        if ($establishmentId) {
+            $query->where('establishment_id', $establishmentId);
         }
-        if ($request->has('establishment_id')) {
-            $query->where('establishment_id', $request->establishment_id);
+
+        // Strict isolation
+        if ($academicYearId) {
+            $query->where('academic_year_id', $academicYearId);
         }
+
         return $query->get();
     }
 
     public function store(Request $request)
     {
+        $user = $request->user();
+        $est = $request->user()->establishment;
+        $activeYear = $est->selected_academic_year_id 
+            ? $est->selectedAcademicYear 
+            : $est->activeAcademicYear;
+        $activeYearId = $activeYear ? $activeYear->id : null;
+        if (!$activeYearId) {
+            return response()->json(['message' => 'Aucune année académique active. Veuillez en créer une dans les paramètres.'], 400);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string',
-            'academic_year_id' => 'required|exists:academic_years,id',
-            'establishment_id' => 'required|exists:establishments,id',
         ]);
 
-        return SchoolClass::create($validated);
+        return SchoolClass::create([
+            ...$validated,
+            'academic_year_id' => $activeYear->id,
+            'establishment_id' => $user->establishment_id,
+        ]);
     }
 
     public function show(SchoolClass $schoolClass)

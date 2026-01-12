@@ -25,7 +25,7 @@ const ClassManagement = ({ user }) => {
             setLoading(true);
             const response = await api.get('/classes', {
                 params: {
-                    academic_year_id: user.establishment.active_academic_year.id,
+                    academic_year_id: user.establishment.selected_academic_year_id || user.establishment.active_academic_year.id,
                     establishment_id: user.establishment_id
                 }
             });
@@ -43,10 +43,10 @@ const ClassManagement = ({ user }) => {
     };
 
     useEffect(() => {
-        if (user?.establishment?.active_academic_year?.id) {
+        if (user?.establishment?.id) {
             fetchClasses();
         }
-    }, [user]);
+    }, [user, user?.establishment?.selected_academic_year_id]);
 
     const handleOpenCreate = () => {
         setEditingClass(null);
@@ -71,7 +71,7 @@ const ClassManagement = ({ user }) => {
                 await api.post('/classes', {
                     name: newClassData.name,
                     establishment_id: user.establishment_id,
-                    academic_year_id: user.establishment.active_academic_year.id
+                    academic_year_id: user.establishment.selected_academic_year_id || user.establishment.active_academic_year.id
                 });
                 toast.success("Classe créée");
             }
@@ -153,7 +153,7 @@ const ClassManagement = ({ user }) => {
                                 <div key={cls.id} className="group bg-white rounded-xl border border-gray-100 p-5 hover:shadow-lg hover:border-blue-100 transition-all duration-300">
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="p-3 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
-                                            <BookOpen className="w-6 h-6" />
+                                            <LayoutGrid className="w-6 h-6" />
                                         </div>
                                         <div className="flex gap-1">
                                             <button

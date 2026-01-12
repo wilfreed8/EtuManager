@@ -17,6 +17,31 @@ class TeacherAssignment extends Model
         'academic_year_id',
     ];
 
+    /**
+     * Validation rules for preventing duplicate assignments
+     */
+    public static function rules()
+    {
+        return [
+            'user_id' => 'required|exists:users,id',
+            'class_id' => 'required|exists:classes,id',
+            'subject_id' => 'required|exists:subjects,id',
+            'academic_year_id' => 'required|exists:academic_years,id',
+        ];
+    }
+
+    /**
+     * Check if assignment already exists
+     */
+    public static function exists($userId, $classId, $subjectId, $academicYearId)
+    {
+        return self::where('user_id', $userId)
+            ->where('class_id', $classId)
+            ->where('subject_id', $subjectId)
+            ->where('academic_year_id', $academicYearId)
+            ->exists();
+    }
+
     public function teacher()
     {
         return $this->belongsTo(User::class, 'user_id');

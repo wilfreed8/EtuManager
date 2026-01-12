@@ -20,6 +20,9 @@ class Establishment extends Model
         'logo_url',
         'grading_config',
         'period_type',
+        'selected_academic_year_id',
+        'bulletin_template',
+        'logo',
     ];
 
     protected $casts = [
@@ -39,5 +42,10 @@ class Establishment extends Model
     public function activeAcademicYear()
     {
         return $this->hasOne(AcademicYear::class)->where('is_active', true);
+    }
+
+    public function selectedAcademicYear()
+    {
+        return $this->belongsTo(AcademicYear::class, 'selected_academic_year_id');
     }
 }

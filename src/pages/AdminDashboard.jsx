@@ -10,12 +10,19 @@ import {
     Activity,
     CheckCircle,
     AlertCircle,
-    Shield
+    Shield,
+    MessageSquare,
+    Plus,
+    X,
+    Trash2,
+    LayoutGrid
 } from 'lucide-react';
-import { Card, Button, Badge, StatsCard } from '../components/ui';
+import { Card, Button, Badge, Input, Select } from '../components/ui';
 import { DonutChart } from '../components/charts';
 import api from '../lib/api';
 import { useEffect } from 'react';
+import { AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 
 // Note: Recent logins would need a separate audit log API - keeping placeholder for now
 const recentLogins = [
@@ -23,7 +30,7 @@ const recentLogins = [
     { user: 'Mark Davis', role: 'Admin', time: 'Today, 09:15 AM', ip: '192.168.1.10', status: 'success' },
 ];
 
-const AdminDashboard = () => {
+const AdminDashboard = ({ user }) => {
     const navigate = useNavigate();
     const [stats, setStats] = useState({
         totalStudents: 0,
@@ -35,6 +42,13 @@ const AdminDashboard = () => {
         gradesPending: 0,
     });
     const [loading, setLoading] = useState(true);
+    const [messages, setMessages] = useState([]);
+    const [showMessageModal, setShowMessageModal] = useState(false);
+    const [newMessage, setNewMessage] = useState({
+        message: '',
+        priority: 'info',
+        expires_at: '',
+    });
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -56,6 +70,42 @@ const AdminDashboard = () => {
         };
         fetchStats();
     }, []);
+
+    useEffect(() => {
+        const fetchMessages = async () => {
+            try {
+                const response = await api.get('/admin-messages/all');
+                setMessages(response.data);
+            } catch (err) {
+                console.error("Error fetching messages:", err);
+            }
+        };
+        fetchMessages();
+    }, []);
+
+    const handleCreateMessage = async () => {
+        try {
+            await api.post('/admin-messages', newMessage);
+            toast.success('Message créé');
+            setShowMessageModal(false);
+            setNewMessage({ message: '', priority: 'info', expires_at: '' });
+            // Refresh messages
+            const response = await api.get('/admin-messages/all');
+            setMessages(response.data);
+        } catch (error) {
+            toast.error('Erreur lors de la création');
+        }
+    };
+
+    const handleDeleteMessage = async (id) => {
+        try {
+            await api.delete(`/admin-messages/${id}`);
+            toast.success('Message supprimé');
+            setMessages(messages.filter(m => m.id !== id));
+        } catch (error) {
+            toast.error('Erreur lors de la suppression');
+        }
+    };
 
 
     const gradePercentage = stats.gradesSubmitted + stats.gradesPending > 0
@@ -95,8 +145,8 @@ const AdminDashboard = () => {
                     <Button variant="outline" icon={FileText} onClick={() => navigate('/reports')}>
                         Generate Bulletins
                     </Button>
-                    <Button icon={Activity}>
-                        View Logs
+                    <Button icon={MessageSquare} onClick={() => setShowMessageModal(true)}>
+                        New Message
                     </Button>
                 </div>
             </div>
@@ -147,7 +197,7 @@ const AdminDashboard = () => {
                                 <p className="text-3xl font-bold text-gray-900 mt-2">{stats.classesManaged}</p>
                             </div>
                             <div className="p-3 bg-green-50 rounded-lg">
-                                <BookOpen className="w-6 h-6 text-green-600" />
+                                <LayoutGrid className="w-6 h-6 text-green-600" />
                             </div>
                         </div>
                     </Card.Content>
@@ -261,6 +311,126 @@ const AdminDashboard = () => {
                     </Card>
                 </motion.div>
             </div>
+
+            {/* Active Messages Section */}
+            {messages.length > 0 && (
+                <motion.div variants={itemVariants}>
+                    <Card>
+                        <Card.Header>
+                            <Card.Title>Messages Actifs</Card.Title>
+                            <Card.Description>Messages envoyés aux enseignants</Card.Description>
+                        </Card.Header>
+                        <Card.Content>
+                            <div className="space-y-3">
+                                {messages.map((msg) => (
+                                    <div
+                                        key={msg.id}
+                                        className={`p-4 rounded-lg border-l-4 ${msg.priority === 'urgent'
+                                            ? 'bg-red-50 border-red-500'
+                                            : msg.priority === 'warning'
+                                                ? 'bg-orange-50 border-orange-500'
+                                                : 'bg-blue-50 border-blue-500'
+                                            }`}
+                                    >
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                                <p className="font-medium text-gray-900">{msg.message}</p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    {new Date(msg.created_at).toLocaleDateString('fr-FR')} • {msg.priority}
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleDeleteMessage(msg.id)}
+                                                className="p-2 hover:bg-red-100 rounded-lg transition-colors"
+                                            >
+                                                <Trash2 className="w-4 h-4 text-red-600" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card.Content>
+                    </Card>
+                </motion.div>
+            )}
+
+            {/* Message Creation Modal */}
+            <AnimatePresence>
+                {showMessageModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl"
+                        >
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-xl font-bold text-gray-900">Nouveau Message</h2>
+                                <button
+                                    onClick={() => setShowMessageModal(false)}
+                                    className="p-2 hover:bg-gray-100 rounded-lg"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Message
+                                    </label>
+                                    <textarea
+                                        value={newMessage.message}
+                                        onChange={(e) => setNewMessage({ ...newMessage, message: e.target.value })}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                        rows="4"
+                                        placeholder="Entrez votre message..."
+                                    />
+                                </div>
+
+                                <Select
+                                    label="Priorité"
+                                    value={newMessage.priority}
+                                    onChange={(e) => setNewMessage({ ...newMessage, priority: e.target.value })}
+                                >
+                                    <option value="info">Information</option>
+                                    <option value="warning">Avertissement</option>
+                                    <option value="urgent">Urgent</option>
+                                </Select>
+
+                                <Input
+                                    label="Date d'expiration (optionnel)"
+                                    type="datetime-local"
+                                    value={newMessage.expires_at}
+                                    onChange={(e) => setNewMessage({ ...newMessage, expires_at: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="flex gap-3 mt-6">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setShowMessageModal(false)}
+                                    className="flex-1"
+                                >
+                                    Annuler
+                                </Button>
+                                <Button
+                                    onClick={handleCreateMessage}
+                                    className="flex-1"
+                                    disabled={!newMessage.message}
+                                >
+                                    Envoyer
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 };

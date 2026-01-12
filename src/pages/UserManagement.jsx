@@ -48,11 +48,10 @@ const UserManagement = ({ user }) => {
     const fetchTeachers = async () => {
         try {
             setLoading(true);
-            // Fetch users with role ENSEIGNANT for the current establishment
-            const response = await api.get(`/users?role=ENSEIGNANT&establishment_id=${user?.establishment_id}`);
+            // Fetch users with audit info
+            const response = await api.get('/users-with-audit');
             const mapped = response.data.map(u => ({
                 ...u,
-                // If backend doesn't return phone/address yet (migration just ran), handle graceful fallback
                 status: 'Active',
                 assignments: u.teacher_assignments?.map(a => a.subject?.name + ' (' + a.school_class?.name + ')') || []
             }));
@@ -183,7 +182,7 @@ const UserManagement = ({ user }) => {
             user_id: selectedTeacher.id,
             subject_id: assignmentData.subject_id,
             class_id: assignmentData.class_id,
-            academic_year_id: user?.establishment?.active_academic_year?.id
+            academic_year_id: user?.establishment?.selected_academic_year_id || user?.establishment?.active_academic_year?.id
         });
 
         toast.promise(promise, {
@@ -252,6 +251,7 @@ const UserManagement = ({ user }) => {
                                 <th className="px-6 py-4">Enseignant</th>
                                 <th className="px-6 py-4">Contact</th>
                                 <th className="px-6 py-4">Classes & Matières</th>
+                                <th className="px-6 py-4">Dernière Connexion</th>
                                 <th className="px-6 py-4">Statut</th>
                                 <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
@@ -263,12 +263,13 @@ const UserManagement = ({ user }) => {
                                         <td className="px-6 py-4"><div className="h-10 bg-gray-100 rounded w-40"></div></td>
                                         <td className="px-6 py-4"><div className="h-8 bg-gray-100 rounded w-32"></div></td>
                                         <td className="px-6 py-4"><div className="h-6 bg-gray-100 rounded w-24"></div></td>
+                                        <td className="px-6 py-4"><div className="h-6 bg-gray-100 rounded w-24"></div></td>
                                         <td className="px-6 py-4"><div className="h-6 bg-gray-100 rounded w-16"></div></td>
                                         <td className="px-6 py-4"><div className="h-8 bg-gray-100 rounded w-20 ml-auto"></div></td>
                                     </tr>
                                 ))
                             ) : (
-                                teachers.filter(t => t.name.toLowerCase().includes(search.toLowerCase())).map((teacher) => (
+                                teachers.filter(t => (t.name || '').toLowerCase().includes(search.toLowerCase())).map((teacher) => (
                                     <tr key={teacher.id} className="hover:bg-gray-50/50 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -303,6 +304,25 @@ const UserManagement = ({ user }) => {
                                                     <Edit className="w-3 h-3" />
                                                 </button>
                                             </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {teacher.last_login ? (
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs text-gray-900">
+                                                        {new Date(teacher.last_login.date).toLocaleDateString('fr-FR', {
+                                                            day: '2-digit',
+                                                            month: 'short',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        })}
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-400 mt-0.5">
+                                                        {teacher.last_login.ip}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-gray-400">Jamais</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4">
                                             <Badge

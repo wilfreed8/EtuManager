@@ -16,6 +16,7 @@ import { Link } from 'react-router-dom';
 
 const TeacherDashboard = ({ user }) => {
     const [myClasses, setMyClasses] = useState([]);
+    const [adminMessages, setAdminMessages] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -45,6 +46,18 @@ const TeacherDashboard = ({ user }) => {
         };
         fetchMyClasses();
     }, [user?.id]);
+
+    useEffect(() => {
+        const fetchAdminMessages = async () => {
+            try {
+                const response = await api.get('/admin-messages');
+                setAdminMessages(response.data);
+            } catch (err) {
+                console.error("Error fetching messages:", err);
+            }
+        };
+        fetchAdminMessages();
+    }, []);
 
     const pendingClassesCount = myClasses.filter(c => c.status === 'pending').length;
     const totalStudentsCount = myClasses.reduce((acc, c) => acc + (c.totalStudents || 0), 0);
@@ -82,6 +95,55 @@ const TeacherDashboard = ({ user }) => {
             animate="visible"
             className="space-y-10 max-w-7xl mx-auto pb-12 animate-in fade-in duration-500"
         >
+            {/* Admin Messages Alert */}
+            {adminMessages.length > 0 && (
+                <div className="space-y-3">
+                    {adminMessages.map((msg) => (
+                        <motion.div
+                            key={msg.id}
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`p-4 rounded-xl border-l-4 ${msg.priority === 'urgent'
+                                    ? 'bg-red-50 border-red-500'
+                                    : msg.priority === 'warning'
+                                        ? 'bg-orange-50 border-orange-500'
+                                        : 'bg-blue-50 border-blue-500'
+                                }`}
+                        >
+                            <div className="flex items-start gap-3">
+                                <AlertCircle
+                                    className={`w-5 h-5 mt-0.5 ${msg.priority === 'urgent'
+                                            ? 'text-red-600'
+                                            : msg.priority === 'warning'
+                                                ? 'text-orange-600'
+                                                : 'text-blue-600'
+                                        }`}
+                                />
+                                <div className="flex-1">
+                                    <p
+                                        className={`font-medium ${msg.priority === 'urgent'
+                                                ? 'text-red-900'
+                                                : msg.priority === 'warning'
+                                                    ? 'text-orange-900'
+                                                    : 'text-blue-900'
+                                            }`}
+                                    >
+                                        {msg.message}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {new Date(msg.created_at).toLocaleDateString('fr-FR', {
+                                            day: 'numeric',
+                                            month: 'long',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        })}
+                                    </p>
+                                </div>
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
+            )}
             {/* Greeting Header */}
             <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>

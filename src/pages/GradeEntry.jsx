@@ -24,6 +24,8 @@ const GradeEntry = ({ user }) => {
     const [numInterros, setNumInterros] = useState(2);
     const [selectedClass, setSelectedClass] = useState('');
     const [activePeriod, setActivePeriod] = useState(null);
+    const [academicYears, setAcademicYears] = useState([]);
+    const [selectedYear, setSelectedYear] = useState('');
     const isAdmin = ['PROVISEUR', 'CENSEUR', 'ADMIN', 'SUPER_ADMIN'].includes(user?.role);
 
     // Fetch assignments and periods on load
@@ -31,7 +33,22 @@ const GradeEntry = ({ user }) => {
         const fetchInitialData = async () => {
             if (!user?.id) return;
             try {
-                // Fetch active period first
+                // Fetch academic years
+                try {
+                    const yearsRes = await api.get('/academic-years');
+                    setAcademicYears(yearsRes.data);
+
+                    // Set selected year (current active/selected from establishment)
+                    const currentYearId = user?.establishment?.selected_academic_year_id || user?.establishment?.active_academic_year?.id;
+                    if (currentYearId) {
+                        setSelectedYear(currentYearId);
+                    } else if (yearsRes.data.length > 0) {
+                        setSelectedYear(yearsRes.data[0].id);
+                    }
+
+                } catch (e) { console.error("Error fetching years", e); }
+
+                // Fetch active period first (for UI default, though we rely on selectedPeriod)
                 const activeRes = await api.get('/active-period');
                 setActivePeriod(activeRes.data);
                 if (activeRes.data) {
@@ -68,9 +85,8 @@ const GradeEntry = ({ user }) => {
                     setSelectedAssignment(mappedAssignments[0]);
                 }
 
-                // Fetch all periods (for admin toggle)
-                const periodRes = await api.get('/periods');
-                setPeriods(periodRes.data);
+                // Removed manual period fetching - driven by admin setting now
+                setPeriods([]);
 
             } catch (err) {
                 console.error("Error fetching initial data", err);
@@ -78,7 +94,28 @@ const GradeEntry = ({ user }) => {
             }
         };
         fetchInitialData();
-    }, [user?.id]);
+    }, [user?.id, user?.establishment?.selected_academic_year_id]); // Re-run if establishment context changes
+
+    // Fetch periods when selectedYear changes
+    useEffect(() => {
+        const fetchPeriodsForYear = async () => {
+            if (!selectedYear) return;
+            try {
+                const res = await api.get('/periods', { params: { academic_year_id: selectedYear } });
+                setPeriods(res.data);
+
+                // If the currently selected period is NOT in this new year's periods, select the first active or just first
+                const currentPeriodStillValid = res.data.find(p => p.id === selectedPeriod);
+                if (!currentPeriodStillValid) {
+                    const activeP = res.data.find(p => p.is_active);
+                    setSelectedPeriod(activeP ? activeP.id : (res.data[0]?.id || ''));
+                }
+            } catch (err) {
+                console.error("Error fetching periods for year", err);
+            }
+        };
+        fetchPeriodsForYear();
+    }, [selectedYear]);
 
     // Update assignment when class changes
     const onClassChange = (classId) => {
@@ -233,7 +270,19 @@ const GradeEntry = ({ user }) => {
                         <span className="text-blue-600 font-bold">Accueil</span> / <span>Classes</span> / <span>{selectedAssignment?.class_name || '...'}</span> / <span className="text-gray-900 font-bold">{selectedAssignment?.subject_name || '...'}</span>
                     </div>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="w-48">
+                        <select
+                            value={selectedYear}
+                            onChange={(e) => setSelectedYear(e.target.value)}
+                            className="w-full h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                        >
+                            {academicYears.map(y => (
+                                <option key={y.id} value={y.id}>{y.label}</option>
+                            ))}
+                        </select>
+                    </div>
+
                     <Button variant="outline" icon={Upload} className="bg-white font-bold border-gray-200" onClick={handleDownloadTemplate}>
                         Modèle CSV
                     </Button>
@@ -275,11 +324,12 @@ const GradeEntry = ({ user }) => {
                     <select
                         value={selectedPeriod}
                         onChange={(e) => setSelectedPeriod(e.target.value)}
-                        disabled={!isAdmin}
-                        className="w-full h-11 px-4 bg-gray-50 border-none rounded-2xl text-sm font-black text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all disabled:opacity-50 cursor-pointer"
+                        className="w-full h-11 px-4 bg-blue-50/50 border border-blue-100 rounded-2xl text-sm font-black text-blue-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer"
                     >
                         {periods.map(p => (
-                            <option key={p.id} value={p.id}>{p.name} {!isAdmin && p.id === activePeriod?.id ? '(Verrouillé)' : ''}</option>
+                            <option key={p.id} value={p.id}>
+                                {p.name} {p.is_active ? '(Active)' : ''}
+                            </option>
                         ))}
                     </select>
                 </div>
