@@ -1,3 +1,4 @@
+import React from 'react';
 import { Bell, Search, ChevronRight } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';

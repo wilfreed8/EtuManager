@@ -20,6 +20,7 @@ import {
   Settings,
   SubjectManagement
 } from './pages';
+import { SchoolsManagement, UsersManagement, PlatformSettings } from './pages/super-admin';
 import './index.css';
 
 function App() {
@@ -32,6 +33,24 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
+  };
+
+  // Function to determine redirect path based on user role
+  const getRedirectPath = () => {
+    if (!user) return '/login';
+
+    if (user.is_super_admin) {
+      return '/super-admin';
+    }
+
+    if (['PROVISEUR', 'CENSEUR', 'SECRETAIRE', 'ADMIN'].includes(user.role)) {
+      // Pour les admins d'école, on a besoin de l'établissement
+      // Pour l'instant, on utilise un chemin par défaut
+      return `/etablissements/admin`;
+    }
+
+    // Pour les enseignants
+    return `/etablissements/teachers`;
   };
 
   // Determine which dashboard to show based on role
@@ -71,7 +90,7 @@ function App() {
             path="/login"
             element={
               user ? (
-                <Navigate to="/dashboard" replace />
+                <Navigate to={getRedirectPath()} replace />
               ) : (
                 <Login onLogin={handleLogin} />
               )
@@ -103,10 +122,14 @@ function App() {
             <Route path="settings" element={<Settings user={user} onUpdateUser={refreshUser} />} />
 
             {/* Super Admin Routes */}
-            <Route path="super-admin" element={<SuperAdminDashboard />} />
-            <Route path="super-admin/schools" element={<div className="p-8 text-center text-gray-500">Gestion des Établissements (TBD)</div>} />
-            <Route path="super-admin/users" element={<div className="p-8 text-center text-gray-500">Gestion des Utilisateurs (TBD)</div>} />
-            <Route path="super-admin/settings" element={<div className="p-8 text-center text-gray-500">Paramètres Plateforme (TBD)</div>} />
+            <Route path="super-admin" element={<SuperAdminDashboard user={user} />} />
+            <Route path="super-admin/schools" element={<SchoolsManagement />} />
+            <Route path="super-admin/users" element={<UsersManagement />} />
+            <Route path="super-admin/settings" element={<PlatformSettings />} />
+
+            {/* Établissements Routes */}
+            <Route path="etablissements/admin" element={<AdminDashboard user={user} />} />
+            <Route path="etablissements/teachers" element={<TeacherDashboard user={user} />} />
           </Route>
 
           {/* 404 */}

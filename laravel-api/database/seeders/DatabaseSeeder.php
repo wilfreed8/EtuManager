@@ -14,6 +14,11 @@ use App\Models\StudentEnrollment;
 use App\Models\TeacherAssignment;
 use App\Models\Grade;
 use App\Models\Role;
+use App\Models\SuperAdmin;
+use App\Models\ClassSubject;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -33,21 +38,33 @@ class DatabaseSeeder extends Seeder
         $adminRole = Role::create(['name' => 'ADMIN']);
         $teacherRole = Role::create(['name' => 'ENSEIGNANT']);
         $proviseurRole = Role::create(['name' => 'PROVISEUR']);
+        $superAdminRole = Role::create(['name' => 'super_admin']);
 
         // 3. Create Super Admin User
-        $superAdmin = User::create([
+        $superAdminUser = User::create([
             'name' => 'Super Admin',
             'email' => 'admin@example.com',
-            'password' => 'password',
-            'establishment_id' => $establishment->id,
+            'password' => Hash::make('password'),
             'is_super_admin' => true,
         ]);
+
+        // Create Super Admin profile
+        SuperAdmin::create([
+            'user_id' => $superAdminUser->id,
+            'admin_code' => 'SUPER-ADMIN-001',
+            'can_manage_schools' => true,
+            'can_manage_users' => true,
+            'can_view_all_data' => true,
+        ]);
+
+        // Assign super admin role
+        $superAdminUser->roles()->attach($superAdminRole);
 
         // 4. Create School Admin (Proviseur)
         $schoolAdmin = User::create([
             'name' => 'Directeur Kokou',
             'email' => 'proviseur@example.com',
-            'password' => 'password',
+            'password' => Hash::make('password'),
             'establishment_id' => $establishment->id,
             'is_super_admin' => false,
         ]);
@@ -57,7 +74,7 @@ class DatabaseSeeder extends Seeder
         $teacher = User::create([
             'name' => 'Prof. Mensah Claire',
             'email' => 'enseignant@example.com',
-            'password' => 'password',
+            'password' => Hash::make('password'),
             'establishment_id' => $establishment->id,
             'is_super_admin' => false,
         ]);
@@ -79,6 +96,12 @@ class DatabaseSeeder extends Seeder
         
         Period::create([
             'name' => 'Trimestre 2',
+            'academic_year_id' => $year->id,
+            'is_active' => false,
+        ]);
+
+        Period::create([
+            'name' => 'Trimestre 3',
             'academic_year_id' => $year->id,
             'is_active' => false,
         ]);
@@ -149,7 +172,50 @@ class DatabaseSeeder extends Seeder
             'establishment_id' => $establishment->id,
         ]);
 
-        // 12. Create Teacher Assignments
+        // 12. Create Class-Subject relationships with coefficients
+        ClassSubject::create([
+            'id' => Str::uuid(),
+            'class_id' => $tle_c->id,
+            'subject_id' => $francais->id,
+            'coefficient' => 4,
+        ]);
+
+        ClassSubject::create([
+            'id' => Str::uuid(),
+            'class_id' => $tle_c->id,
+            'subject_id' => $anglais->id,
+            'coefficient' => 3,
+        ]);
+
+        ClassSubject::create([
+            'id' => Str::uuid(),
+            'class_id' => $tle_c->id,
+            'subject_id' => $math->id,
+            'coefficient' => 5,
+        ]);
+
+        ClassSubject::create([
+            'id' => Str::uuid(),
+            'class_id' => $tle_c->id,
+            'subject_id' => $physique->id,
+            'coefficient' => 4,
+        ]);
+
+        ClassSubject::create([
+            'id' => Str::uuid(),
+            'class_id' => $tle_c->id,
+            'subject_id' => $svt->id,
+            'coefficient' => 3,
+        ]);
+
+        ClassSubject::create([
+            'id' => Str::uuid(),
+            'class_id' => $tle_c->id,
+            'subject_id' => $eps->id,
+            'coefficient' => 1,
+        ]);
+
+        // 13. Create Teacher Assignments
         TeacherAssignment::create([
             'user_id' => $teacher->id,
             'class_id' => $tle_c->id,
@@ -164,24 +230,25 @@ class DatabaseSeeder extends Seeder
             'academic_year_id' => $year->id,
         ]);
 
-        // 13. Create Students for Tle C
+        // 14. Create Students for Tle C
         $students = [];
-        $studentNames = [
-            ['Dupont', 'Jean'],
-            ['Mensah', 'Ama'],
-            ['Agbeko', 'Koffi'],
-            ['Lawson', 'Akouvi'],
-            ['Dodji', 'Kossi'],
-            ['Amouzou', 'Essi'],
-            ['Tetteh', 'Kofi'],
-            ['Adjei', 'Akua'],
+        $studentData = [
+            ['Dupont', 'Jean', 'M', '2005-03-15'],
+            ['Mensah', 'Ama', 'F', '2005-07-22'],
+            ['Agbeko', 'Koffi', 'M', '2005-11-08'],
+            ['Lawson', 'Akouvi', 'F', '2005-02-14'],
+            ['Dodji', 'Kossi', 'M', '2005-09-30'],
+            ['Amouzou', 'Essi', 'F', '2005-06-18'],
+            ['Tetteh', 'Kofi', 'M', '2005-04-25'],
+            ['Adjei', 'Akua', 'F', '2005-12-03'],
         ];
 
-        foreach ($studentNames as $index => $name) {
+        foreach ($studentData as $index => $data) {
             $student = Student::create([
-                'first_name' => $name[1],
-                'last_name' => $name[0],
-                'gender' => $index % 2 === 0 ? 'M' : 'F',
+                'first_name' => $data[1],
+                'last_name' => $data[0],
+                'gender' => $data[2],
+                'birth_date' => $data[3],
                 'registration_number' => 'REG-' . str_pad($index + 1, 4, '0', STR_PAD_LEFT),
                 'establishment_id' => $establishment->id,
             ]);
@@ -194,7 +261,7 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // 14. Create sample grades for first 3 students
+        // 15. Create sample grades for first 3 students
         for ($i = 0; $i < 3; $i++) {
             Grade::create([
                 'student_id' => $students[$i]->id,
@@ -212,6 +279,9 @@ class DatabaseSeeder extends Seeder
         echo "Teacher: enseignant@example.com / password\n";
         echo "Establishment: " . $establishment->name . "\n";
         echo "Students created: " . count($students) . "\n";
+        echo "Academic Year: " . $year->label . "\n";
+        echo "Classes: Tle C, 1ère D\n";
+        echo "Subjects: " . Subject::count() . " created\n";
     }
 }
 

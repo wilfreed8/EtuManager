@@ -3,7 +3,7 @@ import { Select, Button } from '../components/ui';
 import { Plus, BookOpen, X } from 'lucide-react';
 import api from '../lib/api';
 
-const AssignmentForm = ({ teacher, onSuccess, assignmentData, setAssignmentData, handleAddAssignment }) => {
+const AssignmentForm = ({ teacher, onSuccess, assignmentData, setAssignmentData, handleAddAssignment, academicYearId }) => {
     const [classes, setClasses] = useState([]);
     const [subjects, setSubjects] = useState([]);
 
@@ -11,8 +11,8 @@ const AssignmentForm = ({ teacher, onSuccess, assignmentData, setAssignmentData,
         const fetchData = async () => {
             try {
                 const [classRes, subjectRes] = await Promise.all([
-                    api.get('/classes'),
-                    api.get('/subjects')
+                    api.get('/classes', { params: academicYearId ? { academic_year_id: academicYearId } : undefined }),
+                    api.get('/subjects', { params: academicYearId ? { academic_year_id: academicYearId } : undefined })
                 ]);
 
                 setClasses(classRes.data.map(c => ({ value: c.id, label: c.name })));
@@ -22,7 +22,7 @@ const AssignmentForm = ({ teacher, onSuccess, assignmentData, setAssignmentData,
             }
         };
         fetchData();
-    }, []);
+    }, [academicYearId]);
 
     return (
         <div className="space-y-6">

@@ -12,6 +12,7 @@ class Period extends Model
 
     protected $fillable = [
         'name',
+        'order',
         'start_date',
         'end_date',
         'is_active',

@@ -1,3 +1,5 @@
+import React from 'react';
+
 const variants = {
     default: 'bg-gray-100 text-gray-800',
     primary: 'bg-blue-100 text-blue-800',

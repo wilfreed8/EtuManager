@@ -1,11 +1,11 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Modal, Button } from './ui';
 import { Upload, FileUp, Download, AlertCircle } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
-const ImportModal = ({ isOpen, onClose, type, onSuccess, establishmentId }) => {
+const ImportModal = ({ isOpen, onClose, type, onSuccess, establishmentId, academicYearId }) => {
     const [file, setFile] = useState(null);
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef(null);
@@ -30,6 +30,26 @@ const ImportModal = ({ isOpen, onClose, type, onSuccess, establishmentId }) => {
                 ['first_name', 'last_name', 'email', 'phone', 'address', 'specialty']
             ];
             filename = 'modele_import_enseignants.xlsx';
+        } else if (type === 'subjects') {
+            data = [
+                ['name', 'code', 'category', 'coefficient'],
+                ['Mathématiques', 'MATH', 'MATIERES SCIENTIFIQUES', 4],
+                ['Français', 'FR', 'MATIERES LITTERAIRES', 4],
+                ['Anglais', 'ANG', 'MATIERES LITTERAIRES', 3],
+                ['Histoire - Géographie', 'HG', 'MATIERES LITTERAIRES', 3],
+                ['Philosophie', 'PHILO', 'MATIERES LITTERAIRES', 3],
+                ['SVT', 'SVT', 'MATIERES SCIENTIFIQUES', 3],
+                ['Physique - Chimie', 'PC', 'MATIERES SCIENTIFIQUES', 3],
+                ['Sciences Physiques', 'SP', 'MATIERES SCIENTIFIQUES', 3],
+                ['Informatique', 'INFO', 'AUTRES MATIERES', 2],
+                ['Éducation Civique et Morale', 'ECM', 'AUTRES MATIERES', 1],
+                ['EPS', 'EPS', 'AUTRES MATIERES', 1],
+                ['Arts Plastiques', 'ART', 'AUTRES MATIERES', 1],
+                ['Musique', 'MUS', 'AUTRES MATIERES', 1],
+                ['Allemand', 'ALL', 'MATIERES LITTERAIRES', 2],
+                ['Espagnol', 'ESP', 'MATIERES LITTERAIRES', 2],
+            ];
+            filename = 'modele_import_matieres.xlsx';
         }
 
         const worksheet = XLSX.utils.aoa_to_sheet(data);
@@ -60,9 +80,10 @@ const ImportModal = ({ isOpen, onClose, type, onSuccess, establishmentId }) => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('establishment_id', establishmentId);
+        if (academicYearId) formData.append('academic_year_id', academicYearId);
 
         try {
-            const endpoint = type === 'students' ? '/students/import' : '/users/import';
+            const endpoint = type === 'students' ? '/students/import' : type === 'teachers' ? '/users/import' : '/subjects/import';
             await api.post(endpoint, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
@@ -85,7 +106,7 @@ const ImportModal = ({ isOpen, onClose, type, onSuccess, establishmentId }) => {
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`Importer des ${type === 'students' ? 'élèves' : 'enseignants'}`}>
+        <Modal isOpen={isOpen} onClose={onClose} title={`Importer des ${type === 'students' ? 'élèves' : type === 'teachers' ? 'enseignants' : 'matières'}`}>
             <div className="space-y-6">
                 <div className="space-y-4">
                     <div className="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-md">
@@ -97,7 +118,9 @@ const ImportModal = ({ isOpen, onClose, type, onSuccess, establishmentId }) => {
                                 <p className="text-sm text-amber-700">
                                     {type === 'students'
                                         ? "Pour inscrire automatiquement les élèves, le nom de la colonne 'classe' doit correspondre exactement au nom dans 'Gestion des Classes'."
-                                        : "Veuillez respecter l'ordre des colonnes du modèle."
+                                        : type === 'teachers'
+                                            ? "Veuillez respecter l'ordre des colonnes du modèle."
+                                            : "Veuillez respecter l'ordre des colonnes du modèle : name, code, category, coefficient."
                                     }
                                 </p>
                             </div>

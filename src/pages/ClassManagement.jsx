@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Search, Filter, Plus, Edit, Trash2, UserPlus, Users } from 'lucide-react';
+import { BookOpen, Search, Filter, Plus, Edit, Trash2, UserPlus, Users, LayoutGrid } from 'lucide-react';
 import { Card, Button, Input, Select, Badge, Modal } from '../components/ui';
 import api from '../lib/api';
 import { toast } from 'react-hot-toast';

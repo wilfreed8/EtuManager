@@ -58,17 +58,27 @@ class StudentController extends Controller
         }
 
         $validated = $request->validate([
-            'first_name' => 'required|string',
-            'last_name' => 'required|string',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
             'birth_date' => 'nullable|date',
             'gender' => 'nullable|string|in:M,F',
-            'address' => 'nullable|string',
+            'address' => 'nullable|string|max:500',
+            'phone' => 'nullable|string|max:20',
+            'email' => 'nullable|email|max:255',
+            'photo_url' => 'nullable|string|max:500',
             'registration_number' => 'nullable|string|unique:students,registration_number',
-            'parent_name' => 'nullable|string',
-            'parent_phone' => 'nullable|string',
-            'parent_address' => 'nullable|string',
+            'parent_name' => 'nullable|string|max:255',
+            'parent_phone' => 'nullable|string|max:20',
+            'parent_email' => 'nullable|email|max:255',
+            'parent_address' => 'nullable|string|max:500',
+            'parent_profession' => 'nullable|string|max:255',
             'class_id' => 'required|exists:classes,id',
         ]);
+
+        // Generate automatic registration number if not provided
+        if (empty($validated['registration_number'])) {
+            $validated['registration_number'] = $this->generateRegistrationNumber($establishment);
+        }
 
         $student = Student::create([
             ...$validated,
@@ -123,7 +133,35 @@ class StudentController extends Controller
         return response()->noContent();
     }
 
-    public function import(Request $request) 
+    public function generateRegistrationNumber($establishment)
+    {
+        // Get current year
+        $currentYear = date('Y');
+        $yearSuffix = substr($currentYear, -2);
+        
+        // Get establishment code (first 3 letters of name, uppercase)
+        $establishmentCode = strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $establishment->name), 0, 3));
+        
+        // Get next sequence number for this establishment and year
+        $lastStudent = Student::where('establishment_id', $establishment->id)
+            ->where('registration_number', 'like', $establishmentCode . $yearSuffix . '%')
+            ->orderBy('registration_number', 'desc')
+            ->first();
+        
+        $sequence = 1;
+        if ($lastStudent) {
+            $lastSequence = intval(substr($lastStudent->registration_number, -4));
+            $sequence = $lastSequence + 1;
+        }
+        
+        // Format: EST25YYMMDD-0001 (EST = establishment code, 25 = year suffix, YYMMDD = date, 0001 = sequence)
+        $datePart = date('ymd');
+        $sequencePart = str_pad($sequence, 4, '0', STR_PAD_LEFT);
+        
+        return $establishmentCode . $yearSuffix . $datePart . '-' . $sequencePart;
+    }
+
+    public function import(Request $request)
     {
         $request->validate([
             'file' => 'required|file|mimes:csv,txt,xlsx,xls',

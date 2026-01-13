@@ -36,15 +36,25 @@ class UserController extends Controller
     {
         $establishmentId = $request->user()->establishment_id;
 
-        // Get active/selected year
-        $activeYear = $request->user()->establishment->selected_academic_year_id 
-            ? $request->user()->establishment->selectedAcademicYear 
-            : $request->user()->establishment->activeAcademicYear;
-        $activeYearId = $activeYear ? $activeYear->id : null;
+        // Determine academic year context (selected year from settings).
+        // If the client explicitly passes academic_year_id, it takes precedence.
+        $activeYearId = $request->query('academic_year_id');
+
+        if (!$activeYearId) {
+            $activeYear = $request->user()->establishment->selected_academic_year_id
+                ? $request->user()->establishment->selectedAcademicYear
+                : $request->user()->establishment->activeAcademicYear;
+            $activeYearId = $activeYear ? $activeYear->id : null;
+        }
 
         $teachers = User::where('establishment_id', $establishmentId)
             ->whereHas('roles', function($q) {
                 $q->where('name', 'ENSEIGNANT');
+            })
+            ->when($activeYearId, function ($q) use ($activeYearId) {
+                $q->whereHas('academicYears', function ($yq) use ($activeYearId) {
+                    $yq->where('academic_years.id', $activeYearId);
+                });
             })
             ->with(['roles', 'teacherAssignments' => function($q) use ($activeYearId) {
                 if ($activeYearId) {
@@ -89,13 +99,16 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string',
-            'email' => 'required|email|unique:users,email',
-            'phone' => 'nullable|string',
-            'address' => 'nullable|string',
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255|unique:users,email',
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
             'password' => 'required|string|min:8',
             'establishment_id' => 'required|exists:establishments,id',
-            'role' => 'nullable|string'
+            'role' => 'nullable|string|max:100',
+            'avatar_url' => 'nullable|string|max:500',
+            'can_generate_bulletins' => 'boolean',
+            'academic_year_id' => 'nullable|exists:academic_years,id',
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
@@ -114,6 +127,18 @@ class UserController extends Controller
             if ($role) {
                 // Check if already attached to avoid duplicates (though user is new here)
                 $user->roles()->syncWithoutDetaching([$role->id => ['establishment_id' => $validated['establishment_id']]]);
+            }
+
+            // If teacher, attach to selected/active academic year (or provided academic_year_id)
+            if ($roleName === 'ENSEIGNANT') {
+                $yearId = $validated['academic_year_id'] ?? null;
+                if (!$yearId && $request->user() && $request->user()->establishment) {
+                    $est = $request->user()->establishment;
+                    $yearId = $est->selected_academic_year_id ?: optional($est->activeAcademicYear)->id;
+                }
+                if ($yearId) {
+                    $user->academicYears()->syncWithoutDetaching([$yearId]);
+                }
             }
         }
 

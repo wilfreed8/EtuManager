@@ -10,14 +10,36 @@ use App\Models\Establishment;
 
 class SubjectController extends Controller
 {
+    private function resolveAcademicYearId(Request $request): ?string
+    {
+        $yearId = $request->query('academic_year_id') ?? $request->input('academic_year_id');
+        if ($yearId) {
+            return $yearId;
+        }
+
+        $est = $request->user()?->establishment;
+        if (!$est) {
+            return null;
+        }
+
+        return $est->selected_academic_year_id ?: optional($est->activeAcademicYear)->id;
+    }
+
     /**
      * List all subjects for the establishment (Library)
      */
     public function index(Request $request)
     {
         $establishmentId = $request->user()->establishment_id;
+        $yearId = $this->resolveAcademicYearId($request);
+
+        // Strict isolation by academic year
+        if (!$yearId) {
+            return response()->json([]);
+        }
         
         $subjects = Subject::where('establishment_id', $establishmentId)
+            ->where('academic_year_id', $yearId)
             ->orderBy('name')
             ->get();
             
@@ -33,15 +55,22 @@ class SubjectController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'nullable|string|max:20',
             'category' => 'nullable|string',
-            'default_coefficient' => 'integer|min:1'
+            'default_coefficient' => 'integer|min:1',
+            'academic_year_id' => 'nullable|exists:academic_years,id',
         ]);
+
+        $yearId = $this->resolveAcademicYearId($request);
+        if (!$yearId) {
+            return response()->json(['message' => 'Aucune année académique sélectionnée.'], 400);
+        }
 
         $subject = Subject::create([
             'name' => $request->name,
             'code' => $request->code,
             'category' => $request->category,
             'coefficient' => $request->default_coefficient ?? 1,
-            'establishment_id' => $request->user()->establishment_id
+            'establishment_id' => $request->user()->establishment_id,
+            'academic_year_id' => $yearId,
         ]);
 
         return response()->json($subject, 201);
@@ -55,7 +84,9 @@ class SubjectController extends Controller
         $schoolClass = SchoolClass::findOrFail($classId);
         
         // Get all subjects currently assigned to this class with pivot data
-        $assignedSubjects = $schoolClass->subjects;
+        $assignedSubjects = $schoolClass->subjects()
+            ->where('subjects.academic_year_id', $schoolClass->academic_year_id)
+            ->get();
         
         return response()->json($assignedSubjects);
     }
@@ -73,6 +104,25 @@ class SubjectController extends Controller
         ]);
 
         $schoolClass = SchoolClass::findOrFail($classId);
+
+        // Only subjects from the same academic year can be configured for this class
+        $subjectIds = collect($request->subjects)
+            ->filter(fn ($i) => !isset($i['enabled']) || $i['enabled'] !== false)
+            ->pluck('subject_id')
+            ->unique()
+            ->values();
+
+        if ($subjectIds->isNotEmpty()) {
+            $wrongCount = Subject::whereIn('id', $subjectIds)
+                ->where('academic_year_id', '!=', $schoolClass->academic_year_id)
+                ->count();
+
+            if ($wrongCount > 0) {
+                return response()->json([
+                    'message' => 'Certaines matières ne correspondent pas à l\'année académique de la classe.'
+                ], 422);
+            }
+        }
         
         DB::transaction(function () use ($schoolClass, $request) {
             foreach ($request->subjects as $item) {
@@ -108,8 +158,14 @@ class SubjectController extends Controller
     {
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv',
-            'establishment_id' => 'required|exists:establishments,id'
+            'establishment_id' => 'required|exists:establishments,id',
+            'academic_year_id' => 'nullable|exists:academic_years,id',
         ]);
+
+        $yearId = $this->resolveAcademicYearId($request);
+        if (!$yearId) {
+            return response()->json(['message' => 'Aucune année académique sélectionnée.'], 400);
+        }
 
         try {
             $file = $request->file('file');
@@ -122,7 +178,7 @@ class SubjectController extends Controller
             }
 
             $count = 0;
-            DB::transaction(function () use ($rows, $request, &$count) {
+            DB::transaction(function () use ($rows, $request, $yearId, &$count) {
                 foreach ($rows as $row) {
                     // 0: Name, 1: Code, 2: Category, 3: Default Coeff
                     if (empty($row[0])) continue;
@@ -130,7 +186,8 @@ class SubjectController extends Controller
                     Subject::firstOrCreate(
                         [
                             'name' => trim($row[0]),
-                            'establishment_id' => $request->establishment_id
+                            'establishment_id' => $request->establishment_id,
+                            'academic_year_id' => $yearId,
                         ],
                         [
                             'code' => $row[1] ?? strtoupper(substr($row[0], 0, 3)),

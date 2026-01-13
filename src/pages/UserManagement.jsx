@@ -49,7 +49,10 @@ const UserManagement = ({ user }) => {
         try {
             setLoading(true);
             // Fetch users with audit info
-            const response = await api.get('/users-with-audit');
+            const academicYearId = user?.establishment?.selected_academic_year_id || user?.establishment?.active_academic_year?.id;
+            const response = await api.get('/users-with-audit', {
+                params: academicYearId ? { academic_year_id: academicYearId } : undefined,
+            });
             const mapped = response.data.map(u => ({
                 ...u,
                 status: 'Active',
@@ -113,7 +116,8 @@ const UserManagement = ({ user }) => {
             phone: formData.phone,
             address: formData.address,
             establishment_id: user.establishment_id,
-            role: 'ENSEIGNANT'
+            role: 'ENSEIGNANT',
+            academic_year_id: user?.establishment?.selected_academic_year_id || user?.establishment?.active_academic_year?.id
         };
 
         if (formData.password) {
@@ -370,6 +374,7 @@ const UserManagement = ({ user }) => {
                     assignmentData={assignmentData}
                     setAssignmentData={setAssignmentData}
                     handleAddAssignment={handleAddAssignment}
+                    academicYearId={user?.establishment?.selected_academic_year_id || user?.establishment?.active_academic_year?.id}
                 />
             </Modal>
 

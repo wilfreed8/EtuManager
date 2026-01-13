@@ -57,13 +57,13 @@ const ClassCard = ({ classData }) => {
                     ) : (
                         <button className="w-full bg-blue-600 text-white py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all transform hover:scale-[1.02] active:scale-[0.98]">
                             {classData.status === 'pending' ? (
-                                <>
+                                <React.Fragment>
                                     Continue Grading <ArrowRight size={16} />
-                                </>
+                                </React.Fragment>
                             ) : (
-                                <>
+                                <React.Fragment>
                                     Start Grading <Play size={14} fill="currentColor" />
-                                </>
+                                </React.Fragment>
                             )}
                         </button>
                     )}

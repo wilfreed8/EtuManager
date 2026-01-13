@@ -16,11 +16,17 @@ class Subject extends Model
         'coefficient',
         'category',
         'establishment_id',
+        'academic_year_id',
     ];
 
     public function establishment()
     {
         return $this->belongsTo(Establishment::class);
+    }
+
+    public function academicYear()
+    {
+        return $this->belongsTo(AcademicYear::class);
     }
 
     public function teacherAssignments()

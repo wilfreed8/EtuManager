@@ -128,6 +128,11 @@ class AcademicYearController extends Controller
      */
     public function select(Request $request, $yearId)
     {
+        // Check if user is teacher - teachers cannot change academic year
+        if ($request->user()->role === 'ENSEIGNANT') {
+            return response()->json(['error' => 'Les enseignants ne peuvent pas changer l\'année académique'], 403);
+        }
+
         $year = AcademicYear::where('establishment_id', $request->user()->establishment_id)
             ->findOrFail($yearId);
 
@@ -136,5 +141,26 @@ class AcademicYearController extends Controller
         $establishment->save();
 
         return response()->json(['message' => 'Espace de travail mis à jour', 'year' => $year]);
+    }
+
+    /**
+     * Toggle lock status of an academic year
+     */
+    public function toggleLock(Request $request, $yearId)
+    {
+        // Check if user is teacher - teachers cannot lock/unlock years
+        if ($request->user()->role === 'ENSEIGNANT') {
+            return response()->json(['error' => 'Les enseignants ne peuvent pas verrouiller/déverrouiller les années académiques'], 403);
+        }
+
+        $year = AcademicYear::where('establishment_id', $request->user()->establishment_id)
+            ->findOrFail($yearId);
+
+        $year->is_locked = !$year->is_locked;
+        $year->save();
+
+        $message = $year->is_locked ? 'Année académique verrouillée' : 'Année académique déverrouillée';
+        
+        return response()->json(['message' => $message, 'year' => $year]);
     }
 }

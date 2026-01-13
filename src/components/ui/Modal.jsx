@@ -1,3 +1,4 @@
+import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useEffect } from 'react';
@@ -37,7 +38,7 @@ const Modal = ({
     return (
         <AnimatePresence>
             {isOpen && (
-                <>
+                <React.Fragment>
                     {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -91,7 +92,7 @@ const Modal = ({
                             </div>
                         </motion.div>
                     </div>
-                </>
+                </React.Fragment>
             )}
         </AnimatePresence>
     );

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
     Upload,
@@ -272,15 +272,15 @@ const GradeEntry = ({ user }) => {
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="w-48">
-                        <select
+                        <Select
                             value={selectedYear}
                             onChange={(e) => setSelectedYear(e.target.value)}
-                            className="w-full h-10 px-3 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full h-10 text-sm font-bold text-gray-700"
                         >
                             {academicYears.map(y => (
                                 <option key={y.id} value={y.id}>{y.label}</option>
                             ))}
-                        </select>
+                        </Select>
                     </div>
 
                     <Button variant="outline" icon={Upload} className="bg-white font-bold border-gray-200" onClick={handleDownloadTemplate}>
@@ -297,41 +297,41 @@ const GradeEntry = ({ user }) => {
             <Card className="p-4 rounded-3xl border-none shadow-xl shadow-gray-100 flex flex-wrap items-center gap-4 bg-white/80 backdrop-blur-md">
                 <div className="w-48">
                     <p className="text-[10px] font-black uppercase text-gray-400 mb-1 ml-1 tracking-widest">Classe</p>
-                    <select
+                    <Select
                         value={selectedClass}
                         onChange={(e) => onClassChange(e.target.value)}
-                        className="w-full h-11 px-4 bg-gray-50 border-none rounded-2xl text-sm font-black text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer"
+                        className="w-full h-11 text-sm font-black text-gray-700 bg-gray-50 border-none rounded-2xl cursor-pointer"
                     >
                         {classesList.map(c => (
                             <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
-                    </select>
+                    </Select>
                 </div>
                 <div className="w-48">
                     <p className="text-[10px] font-black uppercase text-gray-400 mb-1 ml-1 tracking-widest">Matière</p>
-                    <select
+                    <Select
                         value={selectedAssignment?.id || ''}
                         onChange={(e) => handleAssignmentChange(e.target.value)}
-                        className="w-full h-11 px-4 bg-gray-50 border-none rounded-2xl text-sm font-black text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer"
+                        className="w-full h-11 text-sm font-black text-gray-700 bg-gray-50 border-none rounded-2xl cursor-pointer"
                     >
                         {subjectsForClass.map(s => (
                             <option key={s.id} value={s.id}>{s.subject_name}</option>
                         ))}
-                    </select>
+                    </Select>
                 </div>
                 <div className="w-48">
                     <p className="text-[10px] font-black uppercase text-gray-400 mb-1 ml-1 tracking-widest">Période</p>
-                    <select
+                    <Select
                         value={selectedPeriod}
                         onChange={(e) => setSelectedPeriod(e.target.value)}
-                        className="w-full h-11 px-4 bg-blue-50/50 border border-blue-100 rounded-2xl text-sm font-black text-blue-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer"
+                        className="w-full h-11 text-sm font-black text-blue-700 bg-blue-50/50 border border-blue-100 rounded-2xl cursor-pointer"
                     >
                         {periods.map(p => (
                             <option key={p.id} value={p.id}>
-                                {p.name} {p.is_active ? '(Active)' : ''}
+                                {p.name}
                             </option>
                         ))}
-                    </select>
+                    </Select>
                 </div>
             </Card>
 

@@ -43,4 +43,10 @@ class AcademicYear extends Model
     {
         return $this->hasMany(TeacherAssignment::class);
     }
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'academic_year_user')
+            ->withTimestamps();
+    }
 }

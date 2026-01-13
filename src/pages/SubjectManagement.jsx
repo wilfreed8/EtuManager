@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Button, Input, Select, Badge } from '../components/ui';
-import { Settings, Plus, Save, BookOpen, AlertCircle, Upload, FileUp, Filter } from 'lucide-react';
+import { Settings, Plus, Save, BookOpen, AlertCircle, FileUp, Filter } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from 'react-hot-toast';
+import ImportModal from '../components/ImportModal';
 
-const SubjectManagement = () => {
+const SubjectManagement = ({ user }) => {
     const [activeTab, setActiveTab] = useState('library'); // 'library' or 'config'
     const [subjects, setSubjects] = useState([]);
     const [classes, setClasses] = useState([]);
@@ -12,15 +13,19 @@ const SubjectManagement = () => {
     const [classConfig, setClassConfig] = useState([]); // List of {subject_id, coefficient, enabled}
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
     // New Subject Form
     const [newSubject, setNewSubject] = useState({ name: '', code: '', category: '', default_coefficient: 1 });
     const [showNewModal, setShowNewModal] = useState(false);
 
+    const academicYearId = user?.establishment?.selected_academic_year_id || user?.establishment?.active_academic_year?.id;
+
     useEffect(() => {
         fetchData();
         fetchClasses();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [academicYearId]);
 
     useEffect(() => {
         if (selectedClass && activeTab === 'config') {
@@ -30,7 +35,9 @@ const SubjectManagement = () => {
 
     const fetchData = async () => {
         try {
-            const response = await api.get('/subjects');
+            const response = await api.get('/subjects', {
+                params: academicYearId ? { academic_year_id: academicYearId } : undefined,
+            });
             setSubjects(response.data);
         } catch (error) {
             console.error(error);
@@ -41,7 +48,9 @@ const SubjectManagement = () => {
 
     const fetchClasses = async () => {
         try {
-            const response = await api.get('/classes');
+            const response = await api.get('/classes', {
+                params: academicYearId ? { academic_year_id: academicYearId } : undefined,
+            });
             setClasses(response.data);
             if (response.data.length > 0) setSelectedClass(response.data[0].id);
         } catch (error) {
@@ -79,7 +88,10 @@ const SubjectManagement = () => {
 
     const handleCreateSubject = async () => {
         try {
-            await api.post('/subjects', newSubject);
+            await api.post('/subjects', {
+                ...newSubject,
+                academic_year_id: academicYearId,
+            });
             toast.success("Matière créée");
             setShowNewModal(false);
             setNewSubject({ name: '', code: '', category: '', default_coefficient: 1 });
@@ -112,25 +124,7 @@ const SubjectManagement = () => {
         }
     };
 
-    // Import logic
-    const handleFileUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('establishment_id', '1'); // Should get from context but API gets from user
-
-        try {
-            await api.post('/subjects/import', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-            toast.success("Import réussi");
-            fetchData();
-        } catch (error) {
-            toast.error("Erreur d'import");
-        }
-    };
+    
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto p-6">
@@ -166,12 +160,7 @@ const SubjectManagement = () => {
                                 Bibliothèque Globale ({subjects.length})
                             </h2>
                             <div className="flex gap-2">
-                                <label className="cursor-pointer">
-                                    <div className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm">
-                                        <FileUp className="w-4 h-4" /> Import Excel
-                                    </div>
-                                    <input type="file" className="hidden" onChange={handleFileUpload} accept=".xlsx,.xls,.csv" />
-                                </label>
+                                <Button variant="outline" icon={FileUp} onClick={() => setIsImportModalOpen(true)}>Importer</Button>
                                 <Button onClick={() => setShowNewModal(true)} icon={Plus}>Nouvelle Matière</Button>
                             </div>
                         </div>
@@ -213,20 +202,29 @@ const SubjectManagement = () => {
                 </div>
             )}
 
+            <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                type="subjects"
+                establishmentId={user?.establishment_id}
+                academicYearId={academicYearId}
+                onSuccess={fetchData}
+            />
+
             {activeTab === 'config' && (
                 <div className="space-y-6">
                     <div className="flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                         <Filter className="text-gray-400" />
                         <span className="text-sm font-medium text-gray-700">Sélectionner la classe à configurer :</span>
-                        <select
+                        <Select
                             value={selectedClass}
                             onChange={(e) => setSelectedClass(e.target.value)}
-                            className="flex-1 max-w-xs border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            className="flex-1 max-w-xs"
                         >
                             {classes.map(cls => (
                                 <option key={cls.id} value={cls.id}>{cls.name}</option>
                             ))}
-                        </select>
+                        </Select>
                     </div>
 
                     <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 flex gap-3 text-blue-800">
@@ -241,7 +239,7 @@ const SubjectManagement = () => {
                         {loading ? (
                             <div className="p-8 text-center text-gray-500">Chargement...</div>
                         ) : (
-                            <>
+                            <React.Fragment>
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="font-semibold text-gray-800">Configuration : {classes.find(c => c.id === selectedClass)?.name}</h3>
                                     <Button onClick={handleSaveConfig} loading={saving} icon={Save}>Enregistrer les modifications</Button>
@@ -287,7 +285,7 @@ const SubjectManagement = () => {
                                         </div>
                                     ))}
                                 </div>
-                            </>
+                            </React.Fragment>
                         )}
                     </Card>
                 </div>

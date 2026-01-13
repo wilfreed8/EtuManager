@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { GraduationCap, Search, Edit, Trash2, UserPlus, Filter, X, FileUp } from 'lucide-react';
 import { Card, Button, Input, Select, Badge, Modal } from '../components/ui';

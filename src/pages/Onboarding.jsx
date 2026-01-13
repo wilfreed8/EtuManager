@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../lib/api';
 import { gsap } from 'gsap';
@@ -38,11 +38,11 @@ const Step1 = ({ formData, handleInputChange, onLogoClick, logoPreview }) => (
                 {logoPreview ? (
                     <img src={logoPreview} alt="Logo preview" className="absolute inset-0 w-full h-full object-contain p-4" />
                 ) : (
-                    <>
+                    <React.Fragment>
                         <Upload className="w-10 h-10 text-gray-400 group-hover:text-blue-500 mb-3" />
                         <p className="text-base font-semibold text-gray-700">Télécharger le logo de l'école</p>
                         <p className="text-sm text-gray-400 mt-1">PNG, JPG jusqu'à 2Mo (Format carré recommandé)</p>
-                    </>
+                    </React.Fragment>
                 )}
             </div>
 

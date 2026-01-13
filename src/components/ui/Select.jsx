@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import React, { forwardRef } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 const Select = forwardRef(({
@@ -42,14 +42,14 @@ const Select = forwardRef(({
                     {children ? (
                         children
                     ) : (
-                        <>
+                        <React.Fragment>
                             <option value="" disabled>{placeholder}</option>
                             {options.map((option) => (
                                 <option key={option.value} value={option.value}>
                                     {option.label}
                                 </option>
                             ))}
-                        </>
+                        </React.Fragment>
                     )}
                 </select>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">

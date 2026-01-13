@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, Building2, School, AlertCircle, Upload, Lock, X, Plus, Check, CheckCircle2, Info } from 'lucide-react';
 import { Card, Button, Input, Select } from '../components/ui';
@@ -707,15 +707,15 @@ const Settings = ({ user, onUpdateUser }) => {
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
                                         Période Active Initiale
                                     </label>
-                                    <select
+                                    <Select
                                         value={newYearData.initial_active_period}
                                         onChange={(e) => setNewYearData({ ...newYearData, initial_active_period: parseInt(e.target.value) })}
-                                        className="w-full h-11 px-4 bg-gray-50 border-none rounded-2xl text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        className="w-full h-11 text-sm text-gray-900 bg-gray-50 border-none rounded-2xl"
                                     >
                                         <option value={1}>1ère Période (Trimestre 1 / Semestre 1)</option>
                                         <option value={2}>2ème Période</option>
                                         <option value={3}>3ème Période (Si Trimestre)</option>
-                                    </select>
+                                    </Select>
                                 </div>
                             </div>
 
