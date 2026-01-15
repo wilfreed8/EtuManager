@@ -2,303 +2,351 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Bulletin de Notes - {{ $student->last_name }} {{ $student->first_name }}</title>
+    <title>Bulletin - {{ $student->last_name }} {{ $student->first_name }}</title>
     <style>
-        @page {
-            size: A4;
-            margin: 5mm;
+        @page { size: A4; margin: 10mm; }
+
+        :root {
+            --primary: #1e40af;
+            --primary-light: #eff6ff;
+            --text-dark: #1e293b;
+            --text-gray: #64748b;
+            --border: #e2e8f0;
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            font-family: 'Arial', sans-serif;
-            font-size: 11px;
-            margin: 0;
-            padding: 5px;
-            box-sizing: border-box;
+            font-family: DejaVu Sans, Arial, sans-serif;
+            font-size: 10px;
+            color: var(--text-dark);
         }
-        
-        .header {
+
+        .bulletin-container {
             width: 100%;
-            margin-bottom: 10px;
+            border-top: 4px solid var(--primary);
         }
+
         .header-table {
             width: 100%;
             border-collapse: collapse;
-            border: none;
+            margin-bottom: 10px;
         }
-        .header-table td {
-            vertical-align: top;
-            padding: 0;
+
+        .header-left {
+            font-size: 9px;
+            line-height: 1.4;
+            color: var(--text-gray);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
         }
-        .center-text {
-            text-align: center;
-        }
-        .left-text {
-            text-align: left;
-        }
-        .right-text {
+
+        .header-right {
             text-align: right;
         }
-        .uppercase {
-            text-transform: uppercase;
+
+        .school-name {
+            font-weight: 800;
+            font-size: 16px;
+            color: var(--primary);
         }
-        .bold {
-            font-weight: bold;
-        }
-        
-        .school-info {
-            font-size: 10px;
-            line-height: 1.2;
-        }
-        .republic-info {
-            font-size: 10px;
-            line-height: 1.2;
-        }
-        
-        .title-box {
-            background-color: #d1d5db; /* Gray-300 */
+
+        .logo-box {
+            width: 50px;
+            height: 50px;
+            background: var(--primary-light);
+            border-radius: 12px;
+            display: inline-block;
             text-align: center;
-            padding: 5px;
-            margin: 10px 0;
-            font-weight: bold;
-            border-radius: 4px; /* Mimic rounded pill in image */
+            line-height: 50px;
+            border: 1px solid var(--border);
+        }
+
+        .logo-img {
+            max-height: 50px;
+            max-width: 50px;
+        }
+
+        .bulletin-title {
+            text-align: center;
+            background: var(--primary);
+            color: #fff;
+            padding: 8px;
             font-size: 14px;
+            font-weight: 800;
+            border-radius: 8px;
+            margin: 10px 0 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
         }
-        
-        .student-box-table {
+
+        .student-card {
             width: 100%;
-            border-collapse: collapse;
+            border: 1px solid var(--border);
+            background: var(--primary-light);
+            border-radius: 10px;
+            padding: 10px;
             margin-bottom: 10px;
-            background-color: #f3f4f6; /* Light gray */
-            border: 1px solid #9ca3af;
         }
-        .student-box-table td {
-            padding: 5px;
-            border: none;
+
+        .student-name {
+            font-size: 14px;
+            font-weight: 800;
         }
+
+        .muted { color: var(--text-gray); }
 
         .grades-table {
             width: 100%;
             border-collapse: collapse;
+            border: 1px solid var(--border);
             margin-bottom: 10px;
-            font-size: 10px;
+            font-size: 9px;
         }
-        .grades-table th, .grades-table td {
-            border: 1px solid #000;
-            padding: 3px;
+
+        .grades-table th {
+            background: #f8fafc;
+            color: var(--text-gray);
+            font-weight: 800;
+            text-transform: uppercase;
+            font-size: 8px;
+            padding: 6px 4px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .grades-table td {
+            padding: 6px 4px;
+            border-bottom: 1px solid var(--border);
             text-align: center;
         }
-        .grades-table th {
-            background-color: #e5e7eb;
-            font-weight: bold;
-        }
-        .grades-table .subject-col {
-            text-align: left;
-            width: 25%;
-        }
-        .grades-table .category-row {
-            background-color: #dbeafe; /* Light blue */
-            font-weight: bold;
+
+        .category-row td {
+            background: #f1f5f9;
+            color: var(--primary);
+            font-weight: 800;
             text-align: left;
             padding-left: 10px;
         }
-        
-        .footer-section {
-            display: flex; /* Flex doesn't work well in DOMPDF sometimes, using table instead */
-            width: 100%;
-            margin-top: 10px;
-        }
-        .footer-table {
-            width: 100%;
-            border-collapse: collapse;
-            border: 1px solid #000;
-        }
-        .footer-table td {
-            border: 1px solid #000;
-            padding: 5px;
-            vertical-align: top;
+
+        .subject-cell { text-align: left; padding-left: 10px; font-weight: 700; }
+        .avg-cell { font-weight: 800; color: var(--primary); }
+
+        .total-row td {
+            background: var(--primary);
+            color: #fff;
+            font-weight: 800;
+            border-bottom: none;
         }
 
-        .summary-box {
-            border: 1px solid #000;
-            padding: 5px;
-            margin-top: 5px;
-            font-size: 10px;
+        .overall-box {
+            width: 100%;
+            border: 2px solid var(--primary);
+            border-radius: 10px;
+            padding: 10px;
+            margin: 10px 0;
         }
-        
-        .signature-box {
-            border: 1px solid #000;
-            height: 80px;
-            margin-top: 5px;
-            text-align: center;
-            font-weight: bold;
+
+        .overall-table { width: 100%; border-collapse: collapse; }
+        .overall-table td { vertical-align: top; }
+        .big-number { font-size: 22px; font-weight: 900; color: var(--primary); }
+        .label { font-size: 9px; text-transform: uppercase; font-weight: 800; color: var(--text-gray); }
+
+        .footer-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+        .footer-table td { vertical-align: top; padding: 6px; }
+
+        .card {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 8px;
         }
-        
-        .logo-img {
-            max-height: 60px;
-            max-width: 60px;
+
+        .card-title {
+            font-weight: 900;
+            font-size: 9px;
+            color: var(--text-gray);
+            text-transform: uppercase;
+            margin-bottom: 8px;
         }
-        
-        /* Utility */
-        .w-full { width: 100%; }
-        .text-xs { font-size: 9px; }
-        .mb-2 { margin-bottom: 5px; }
-        
+
+        .signatures-table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+        .signatures-table td { width: 50%; text-align: center; padding: 6px; vertical-align: top; }
+        .sign-title { font-weight: 900; font-size: 10px; margin-bottom: 34px; }
+        .sign-line { border-top: 1px solid var(--text-dark); padding-top: 6px; font-size: 9px; font-weight: 700; }
+
+        .small-note { text-align: center; margin-top: 8px; font-size: 8px; color: var(--text-gray); }
+    
     </style>
 </head>
 <body>
 
-    <!-- Header -->
-    <table class="header-table">
-        <tr>
-            <td width="40%" class="center-text school-info">
-                @if($establishment->logo)
-                    <img src="{{ public_path($establishment->logo) }}" class="logo-img"><br>
-                @endif
-                <span class="uppercase bold">{{ $establishment->name }}</span><br>
-                {{ $establishment->address }}<br>
-                Tél: {{ $establishment->phone }}<br>
-                {{ $establishment->city }}
-            </td>
-            <td width="20%" class="center-text">
-                <!-- Center Logo or Emblem -->
-                <!-- <img src="..." class="logo-img"> -->
-            </td>
-            <td width="40%" class="center-text republic-info">
-                <span class="uppercase bold">République Togolaise</span><br>
-                Travail - Liberté - Patrie<br>
-                <br>
-                Année Scolaire: {{ $period->academicYear->label }}
-            </td>
-        </tr>
-    </table>
-
-    <!-- Title -->
-    <div class="title-box uppercase">
-        BULLETIN DE NOTES DU {{ $period->name }}
-    </div>
-
-    <!-- Student Info -->
-    <div style="text-align: center; font-weight: bold; margin-bottom: 5px;">
-        Classe : {{ $class->name }} &nbsp;&nbsp;&nbsp;&nbsp; Effectif : {{ $classSize }}
-    </div>
-    
-    <table class="student-box-table">
-        <tr>
-            <td width="60%">
-                NOM ET PRENOMS : <span class="uppercase bold" style="font-size: 14px;">{{ $student->last_name }} {{ $student->first_name }}</span>
-            </td>
-            <td width="40%" class="right-text">
-                Statut : <span class="bold">N/A</span> <br> <!-- Statut (Nouveau/Ancien) - Need DB field -->
-                Sexe : <span class="bold">{{ $student->gender }}</span> <br>
-                Matricule : <span class="bold">{{ $student->registration_number }}</span>
-            </td>
-        </tr>
-    </table>
-
-    <!-- Grades Table -->
-    <table class="grades-table">
-        <thead>
+    <div class="bulletin-container">
+        <table class="header-table">
             <tr>
-                <th class="subject-col">Matières</th>
-                <th>Interro</th>
-                <th>Devoir</th>
-                <th>Compo</th>
-                <th>Moy.<br>(20)</th>
-                <th>Coef</th>
-                <th>Total</th>
-                <th>Rang</th>
-                <th>Professeur</th>
-                <th>Appréciation</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($subjectsByCategory as $category => $grades)
-                <tr class="category-row">
-                    <td colspan="10">{{ $category }}</td>
-                </tr>
-                @foreach($grades as $grade)
-                    <tr>
-                        <td class="subject-col">{{ $grade->subject->name }}</td>
-                        <td>{{ number_format($grade->interro_avg, 2) }}</td>
-                        <td>{{ number_format($grade->devoir_avg, 2) }}</td>
-                        <td>{{ number_format($grade->compo_grade, 2) }}</td>
-                        <td class="bold">{{ number_format($grade->average, 2) }}</td>
-                        <td>{{ $grade->subject->coefficient }}</td>
-                        <td>{{ number_format($grade->weighted_average, 2) }}</td>
-                        <td>-</td> <!-- Rank per subject could be calc -->
-                        <td class="text-xs">{{ $grade->teacher }}</td>
-                        <td class="text-xs">{{ $grade->appreciation }}</td>
-                    </tr>
-                @endforeach
-            @endforeach
-            
-            <!-- Totals Row -->
-            <tr style="background-color: #f3f4f6; font-weight: bold;">
-                <td class="right-text">TOTAL GENERALE</td>
-                <td colspan="4"></td>
-                <td>{{ $report->sum('coefficient') }}</td>
-                <td>{{ number_format($report->sum('weighted_average'), 2) }}</td>
-                <td colspan="3"></td>
-            </tr>
-        </tbody>
-    </table>
-
-    <!-- Footer / Summary -->
-    <table class="footer-table">
-        <tr>
-            <!-- Left: History & Decision -->
-            <td width="60%">
-                <div class="mb-2">
-                    <strong>Moyenne Trimestrielle :</strong>
-                    <span style="font-size: 14px; font-weight: bold; border: 2px solid #000; padding: 3px 8px; border-radius: 4px; margin-left: 10px;">
-                        {{ number_format($overallAverage, 2) }}
-                    </span>
-                    &nbsp;&nbsp; <strong>Rang :</strong> {{ $rank }} / {{ $classSize }}
-                </div>
-                
-                <div style="margin-top: 10px; border-top: 1px solid #ccc; padding-top: 5px;">
-                    <strong>Historique :</strong><br>
-                    @foreach($previousPeriods as $prev)
-                        {{ $prev['name'] }}: {{ $prev['average'] !== null ? number_format($prev['average'], 2) : '-' }} <br>
-                    @endforeach
-                </div>
-                
-                <div style="margin-top: 15px;">
-                    <strong>DÉCISION DU CONSEIL DE CLASSE :</strong><br>
-                    <div style="font-family: 'Brush Script MT', cursive; font-size: 18px; color: #1e3a8a; margin-top: 5px;">
-                        <!-- Simple logic for decision based on avg -->
-                        @if($overallAverage >= 10) Admis(e) @else Échoué(e) @endif
+                <td width="38%" class="header-left">
+                    RÉPUBLIQUE TOGOLAISE<br>
+                    <span style="font-style: italic; text-transform:none;">Travail - Liberté - Patrie</span><br><br>
+                    MINISTÈRE DES ENSEIGNEMENTS<br>
+                    PRIMAIRE ET SECONDAIRE
+                </td>
+                <td width="24%" style="text-align:center;">
+                    <div class="logo-box">
+                        @if($establishment->logo)
+                            <img src="{{ public_path($establishment->logo) }}" class="logo-img">
+                        @else
+                            <span style="font-weight: 900; color: var(--primary);">{{ strtoupper(substr($establishment->name ?? 'E', 0, 1)) }}</span>
+                        @endif
                     </div>
-                </div>
-            </td>
-            
-            <!-- Right: Stats & Signatures -->
-            <td width="40%">
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
-                    <tr>
-                        <td style="border: 1px solid #ccc; padding: 2px;">Plus forte moy.</td>
-                        <td style="border: 1px solid #ccc; padding: 2px; font-weight: bold;">{{ number_format($classStats['highest'], 2) }}</td>
-                    </tr>
-                    <tr>
-                        <td style="border: 1px solid #ccc; padding: 2px;">Plus faible moy.</td>
-                        <td style="border: 1px solid #ccc; padding: 2px; font-weight: bold;">{{ number_format($classStats['lowest'], 2) }}</td>
-                    </tr>
-                    <tr>
-                        <td style="border: 1px solid #ccc; padding: 2px;">Moyenne Classe</td>
-                        <td style="border: 1px solid #ccc; padding: 2px; font-weight: bold;">{{ number_format($classStats['average'], 2) }}</td>
-                    </tr>
-                </table>
-                
-                <div style="margin-top: 50px; text-align: center;">
-                    <strong>Le Chef d'Établissement</strong><br>
-                    <br><br><br>
-                </div>
-            </td>
-        </tr>
-    </table>
-    
-    <div style="font-size: 9px; margin-top: 5px; text-align: center; color: #666;">
-        Bulletin généré électroniquement par Antigravity - {{ now()->format('d/m/Y H:i') }}
+                </td>
+                <td width="38%" class="header-right">
+                    <div class="school-name">{{ $establishment->name }}</div>
+                    <div class="muted" style="font-size:9px; line-height:1.3;">
+                        {{ $establishment->address }}@if($establishment->city) • {{ $establishment->city }}@endif<br>
+                        @if($establishment->phone) Tel: {{ $establishment->phone }}@endif
+                    </div>
+                    <div style="margin-top:6px; font-weight:800;">Année scolaire: {{ $period->academicYear->label }}</div>
+                </td>
+            </tr>
+        </table>
+
+        <div class="bulletin-title">Bulletin de Notes - {{ $period->name }}</div>
+
+        <div class="student-card">
+            <table style="width:100%; border-collapse: collapse;">
+                <tr>
+                    <td width="70%">
+                        <div class="student-name">{{ strtoupper($student->last_name) }} {{ $student->first_name }}</div>
+                        <div class="muted" style="margin-top:4px; font-size:9px;">
+                            <strong>Matricule:</strong> {{ $student->registration_number ?? 'N/A' }} &nbsp;&nbsp;|
+                            <strong>Classe:</strong> {{ $class->name }} &nbsp;&nbsp;|
+                            <strong>Effectif:</strong> {{ $classSize }} &nbsp;&nbsp;|
+                            <strong>Sexe:</strong> {{ $student->gender ?? '-' }}
+                        </div>
+                    </td>
+                    <td width="30%" style="text-align:right; font-size:9px;" class="muted">
+                        Généré le: {{ now()->format('d/m/Y') }}
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <table class="grades-table">
+            <thead>
+                <tr>
+                    <th style="text-align:left; padding-left:10px; width: 170px;">Matières</th>
+                    <th>Int.</th>
+                    <th>Dev.</th>
+                    <th>Comp.</th>
+                    <th>Moy./20</th>
+                    <th>Coef.</th>
+                    <th>Total</th>
+                    <th style="width: 100px;">Professeur</th>
+                    <th style="width: 120px;">Appréciation</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($subjectsByCategory as $category => $rows)
+                    <tr class="category-row"><td colspan="9">{{ $category }}</td></tr>
+                    @foreach($rows as $row)
+                        <tr>
+                            <td class="subject-cell">{{ $row['subject'] ?? 'N/A' }}</td>
+                            <td>{{ number_format((float)($row['interro'] ?? 0), 2) }}</td>
+                            <td>{{ number_format((float)($row['devoir'] ?? 0), 2) }}</td>
+                            <td>{{ number_format((float)($row['compo'] ?? 0), 2) }}</td>
+                            <td class="avg-cell">{{ number_format((float)($row['average'] ?? 0), 2) }}</td>
+                            <td>{{ (int)($row['coefficient'] ?? 1) }}</td>
+                            <td>{{ number_format((float)($row['weighted_average'] ?? 0), 2) }}</td>
+                            <td style="font-size:8px;" class="muted">{{ $row['teacher'] ?? 'N/A' }}</td>
+                            <td style="font-size:8px;" class="muted">{{ $row['appreciation'] ?? '' }}</td>
+                        </tr>
+                    @endforeach
+                @endforeach
+
+                <tr class="total-row">
+                    <td colspan="5" style="text-align:right; padding-right:10px;">TOTAL GÉNÉRAL</td>
+                    <td>{{ $report->sum('coefficient') }}</td>
+                    <td>{{ number_format((float)$report->sum('weighted_average'), 2) }}</td>
+                    <td colspan="2"></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="overall-box">
+            <table class="overall-table">
+                <tr>
+                    <td width="50%" style="text-align:center;">
+                        <div class="label">Moyenne du {{ $period->name }}</div>
+                        <div class="big-number">{{ number_format((float)$overallAverage, 2) }} <span style="font-size:12px; color: var(--text-gray);">/ 20</span></div>
+                    </td>
+                    <td width="50%" style="text-align:center;">
+                        <div class="label">Classement</div>
+                        <div style="font-size:18px; font-weight:900;">{{ $rank }} <span style="font-size:12px; color: var(--text-gray);">sur {{ $classSize }}</span></div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <table class="footer-table">
+            <tr>
+                <td width="50%">
+                    <div class="card">
+                        <div class="card-title">Synthèse Annuelle</div>
+                        @forelse($previousPeriods as $prev)
+                            <table style="width:100%; border-collapse:collapse; font-size:9px; margin-bottom:4px;">
+                                <tr>
+                                    <td class="muted" style="text-align:left;">{{ $prev['name'] }}</td>
+                                    <td style="text-align:right; font-weight:800;">{{ $prev['average'] !== null ? number_format((float)$prev['average'], 2) : '-' }}</td>
+                                </tr>
+                            </table>
+                        @empty
+                            <div class="muted" style="font-size:9px;">-</div>
+                        @endforelse
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Observations du Conseil</div>
+                        <div style="height:60px; border:1px dashed var(--border); border-radius:8px;"></div>
+                    </div>
+                </td>
+                <td width="50%">
+                    <div class="card">
+                        <div class="card-title">Performances de la Classe</div>
+                        <table style="width:100%; border-collapse:collapse; font-size:9px;">
+                            <tr>
+                                <td class="muted" style="text-align:left; padding-bottom:4px;">Plus forte moyenne</td>
+                                <td style="text-align:right; font-weight:800; padding-bottom:4px;">{{ number_format((float)($classStats['highest'] ?? 0), 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="muted" style="text-align:left; padding-bottom:4px;">Plus faible moyenne</td>
+                                <td style="text-align:right; font-weight:800; padding-bottom:4px;">{{ number_format((float)($classStats['lowest'] ?? 0), 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="muted" style="text-align:left;">Moyenne générale</td>
+                                <td style="text-align:right; font-weight:800;">{{ number_format((float)($classStats['average'] ?? 0), 2) }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Appréciation Proviseur</div>
+                        <div style="height:60px; border:1px dashed var(--border); border-radius:8px;"></div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <table class="signatures-table">
+            <tr>
+                <td>
+                    <div class="sign-title">Le Titulaire de Classe</div>
+                    <div class="sign-line">SIGNATURE</div>
+                </td>
+                <td>
+                    <div class="sign-title">Le Chef d'Établissement</div>
+                    <div class="sign-line">Lomé, le ____/____/________</div>
+                </td>
+            </tr>
+        </table>
+
+        <div class="small-note">Ce bulletin généré numériquement est authentique. Il doit être conservé précieusement.</div>
     </div>
 
 </body>

@@ -39,6 +39,8 @@ const SchoolsManagement = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [selectedSchool, setSelectedSchool] = useState(null);
+    const [saving, setSaving] = useState(false);
+    const [deletingSchoolId, setDeletingSchoolId] = useState(null);
     const [formData, setFormData] = useState({
         name: '',
         type: 'LYCEE',
@@ -69,6 +71,7 @@ const SchoolsManagement = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setSaving(true);
         try {
             if (selectedSchool) {
                 await api.put(`/super-admin/schools/${selectedSchool.id}`, formData);
@@ -82,6 +85,8 @@ const SchoolsManagement = () => {
             resetForm();
         } catch (error) {
             toast.error('Erreur lors de l\'opération');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -93,12 +98,15 @@ const SchoolsManagement = () => {
 
     const handleDelete = async (schoolId) => {
         if (confirm('Êtes-vous sûr de vouloir supprimer cet établissement ?')) {
+            setDeletingSchoolId(schoolId);
             try {
                 await api.delete(`/super-admin/schools/${schoolId}`);
                 toast.success('Établissement supprimé avec succès');
                 fetchSchools();
             } catch (error) {
                 toast.error('Erreur lors de la suppression');
+            } finally {
+                setDeletingSchoolId(null);
             }
         }
     };
@@ -249,6 +257,7 @@ const SchoolsManagement = () => {
                                                 size="sm"
                                                 onClick={() => handleEdit(school)}
                                                 icon={Edit}
+                                                disabled={saving || deletingSchoolId === school.id}
                                             >
                                                 Modifier
                                             </Button>
@@ -257,6 +266,8 @@ const SchoolsManagement = () => {
                                                 size="sm"
                                                 onClick={() => handleDelete(school.id)}
                                                 icon={Trash2}
+                                                loading={deletingSchoolId === school.id}
+                                                disabled={saving || deletingSchoolId === school.id}
                                             >
                                                 Supprimer
                                             </Button>
@@ -365,13 +376,15 @@ const SchoolsManagement = () => {
                                 resetForm();
                             }}
                             className="flex-1"
+                            disabled={saving}
                         >
                             Annuler
                         </Button>
                         <Button
                             type="submit"
                             className="flex-1"
-                            disabled={!formData.name}
+                            loading={saving}
+                            disabled={saving || !formData.name}
                         >
                             {selectedSchool ? 'Mettre à jour' : 'Créer'}
                         </Button>

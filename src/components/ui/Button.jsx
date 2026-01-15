@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 
 const variants = {
@@ -25,13 +25,48 @@ const Button = forwardRef(({
     loading = false,
     icon: Icon,
     iconPosition = 'left',
+    onClick,
     ...props
 }, ref) => {
+    const [internalLoading, setInternalLoading] = useState(false);
+    const mountedRef = useRef(true);
+
+    useEffect(() => {
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
+
+    const effectiveLoading = loading || internalLoading;
+    const effectiveDisabled = disabled || effectiveLoading;
+
+    const handleClick = async (e) => {
+        if (!onClick || effectiveDisabled) return;
+
+        // If loading is manually controlled, don't use auto-loading
+        if (loading) {
+            onClick(e);
+            return;
+        }
+
+        try {
+            const result = onClick(e);
+            if (result && typeof result.then === 'function') {
+                setInternalLoading(true);
+                await result;
+            }
+        } finally {
+            if (mountedRef.current) {
+                setInternalLoading(false);
+            }
+        }
+    };
+
     return (
         <motion.button
             ref={ref}
-            whileHover={{ scale: disabled ? 1 : 1.02 }}
-            whileTap={{ scale: disabled ? 1 : 0.98 }}
+            whileHover={{ scale: effectiveDisabled ? 1 : 1.02 }}
+            whileTap={{ scale: effectiveDisabled ? 1 : 0.98 }}
             className={`
         inline-flex items-center justify-center gap-2 font-medium rounded-lg
         transition-colors duration-200 focus:outline-none focus:ring-2 
@@ -41,10 +76,11 @@ const Button = forwardRef(({
         ${sizes[size]}
         ${className}
       `}
-            disabled={disabled || loading}
+            disabled={effectiveDisabled}
+            onClick={handleClick}
             {...props}
         >
-            {loading ? (
+            {effectiveLoading ? (
                 <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />

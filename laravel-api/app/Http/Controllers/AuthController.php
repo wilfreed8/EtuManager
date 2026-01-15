@@ -21,6 +21,9 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
+            // Log failed login attempt
+            AuditLog::logFailedLogin($request->email, $request);
+            
             throw ValidationException::withMessages([
                 'email' => ['Les identifiants fournis sont incorrects.'],
             ]);
@@ -28,8 +31,8 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
-        // Log the login
-        AuditLog::logLogin($user->id, $request);
+        // Log the successful login
+        AuditLog::logLogin($user->id, $request, 'success');
 
         return response()->json([
             'access_token' => $token,
@@ -40,6 +43,13 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        $user = $request->user();
+        
+        // Log the logout
+        if ($user) {
+            AuditLog::logLogout($user->id, $request);
+        }
+        
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Déconnexion réussie.']);

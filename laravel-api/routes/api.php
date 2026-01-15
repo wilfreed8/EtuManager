@@ -88,6 +88,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Teacher routes
     Route::get('/teachers/my-assignments', [TeacherController::class, 'myAssignments']);
     
+    // Audit logs routes
+    Route::get('/audit-logs', [\App\Http\Controllers\AuditLogController::class, 'index']);
+    Route::get('/audit-logs/login-stats', [\App\Http\Controllers\AuditLogController::class, 'loginStats']);
+    
     // Bulletin routes
     Route::get('/bulletins/{student}/{period}', [\App\Http\Controllers\BulletinController::class, 'generate']);
     Route::get('/bulletins/class/{classId}/period/{periodId}', [\App\Http\Controllers\BulletinController::class, 'generateClassBulletins']);

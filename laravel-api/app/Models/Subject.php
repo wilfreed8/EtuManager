@@ -38,5 +38,12 @@ class Subject extends Model
     {
         return $this->hasMany(Grade::class);
     }
+
+    public function schoolClasses()
+    {
+        return $this->belongsToMany(SchoolClass::class, 'class_subjects', 'subject_id', 'class_id')
+                    ->withPivot('coefficient')
+                    ->withTimestamps();
+    }
 }
 

@@ -173,8 +173,21 @@ class SubjectController extends Controller
             $rows = $data[0] ?? collect([]);
 
             // Skip header
-            if ($rows->count() > 0 && str_contains(strtolower($rows[0][0] ?? ''), 'nom')) {
-                $rows->shift();
+            if ($rows->count() > 0) {
+                $h0 = strtolower(trim((string)($rows[0][0] ?? '')));
+                $h1 = strtolower(trim((string)($rows[0][1] ?? '')));
+                $h2 = strtolower(trim((string)($rows[0][2] ?? '')));
+                $h3 = strtolower(trim((string)($rows[0][3] ?? '')));
+
+                $looksLikeHeader =
+                    (in_array($h0, ['nom', 'name'], true) || str_contains($h0, 'nom') || str_contains($h0, 'name')) &&
+                    (in_array($h1, ['code'], true) || str_contains($h1, 'code')) &&
+                    (in_array($h2, ['categorie', 'catégorie', 'category'], true) || str_contains($h2, 'cat')) &&
+                    (in_array($h3, ['coefficient', 'coeff'], true) || str_contains($h3, 'coeff'));
+
+                if ($looksLikeHeader) {
+                    $rows->shift();
+                }
             }
 
             $count = 0;
@@ -203,6 +216,39 @@ class SubjectController extends Controller
 
         } catch (\Exception $e) {
             return response()->json(['message' => "Erreur import: " . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Delete a subject for a specific academic year
+     */
+    public function destroy(Request $request, $id)
+    {
+        $yearId = $this->resolveAcademicYearId($request);
+        if (!$yearId) {
+            return response()->json(['message' => 'Aucune année académique sélectionnée.'], 400);
+        }
+
+        $subject = Subject::where('id', $id)
+            ->where('establishment_id', $request->user()->establishment_id)
+            ->where('academic_year_id', $yearId)
+            ->first();
+
+        if (!$subject) {
+            return response()->json(['message' => 'Matière non trouvée.'], 404);
+        }
+
+        try {
+            DB::transaction(function () use ($subject) {
+                // Detach from all classes first
+                $subject->schoolClasses()->detach();
+                // Delete the subject
+                $subject->delete();
+            });
+
+            return response()->json(['message' => 'Matière supprimée avec succès.']);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Erreur lors de la suppression: ' . $e->getMessage()], 500);
         }
     }
 }

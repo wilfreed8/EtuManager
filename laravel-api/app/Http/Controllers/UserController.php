@@ -169,55 +169,135 @@ class UserController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|mimes:csv,txt,xlsx,xls',
+            'file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240', // Max 10MB
             'establishment_id' => 'required|exists:establishments,id'
         ]);
 
         $file = $request->file('file');
         
+        // Check file size manually for better error messages
+        if ($file->getSize() > 10 * 1024 * 1024) { // 10MB
+            return response()->json([
+                'message' => 'Fichier trop volumineux',
+                'errors' => ['Le fichier ne doit pas dépasser 10MB']
+            ], 413);
+        }
+        
         try {
             $data = \Maatwebsite\Excel\Facades\Excel::toCollection(new \stdClass, $file);
             $rows = $data[0] ?? collect([]);
             
+            // Skip header row - check for common header patterns
             if ($rows->count() > 0) {
-                 $firstRow = $rows->first();
-                 if (is_string($firstRow[0]) && str_contains(strtolower($firstRow[0]), 'first_name')) {
-                     $rows->shift();
-                 }
+                $firstRow = $rows->first();
+                $firstCell = strtolower(trim((string)($firstRow[0] ?? '')));
+                $secondCell = strtolower(trim((string)($firstRow[1] ?? '')));
+                
+                // Check if first row contains headers
+                $isHeader = in_array($firstCell, ['first_name', 'nom', 'name', 'prénom', 'prenom']) || 
+                           in_array($secondCell, ['last_name', 'email', 'mail']);
+                
+                if ($isHeader) {
+                    $rows->shift();
+                }
             }
 
             $count = 0;
             $skipped = 0;
+            $errors = [];
             $role = Role::firstOrCreate(['name' => 'ENSEIGNANT']);
+            
+            // Get academic year context
+            $academicYearId = $request->user()->establishment->selected_academic_year_id ?? 
+                           optional($request->user()->establishment->activeAcademicYear)->id;
 
-            foreach ($rows as $row) {
-                // first_name, last_name, email, phone, address, specialite
-                if (!isset($row[2])) continue;
-
-                $email = $row[2];
-                if (User::where('email', $email)->exists()) {
-                    $skipped++;
+            foreach ($rows as $index => $row) {
+                $rowIndex = $index + 2; // +2 because Excel is 1-based and we might have skipped header
+                
+                // Expected columns: first_name, last_name, email, phone, address, specialty
+                // Only first_name, last_name, and email are required
+                if (!isset($row[0]) || !isset($row[1]) || !isset($row[2])) {
+                    $errors[] = "Ligne {$rowIndex}: Colonnes nom, prénom et email requises";
                     continue;
                 }
 
-                $user = User::create([
-                    'name' => $row[0] . ' ' . $row[1],
-                    'email' => $email,
-                    'phone' => $row[3] ?? null,
-                    'address' => $row[4] ?? null,
-                    'establishment_id' => $request->establishment_id,
-                    'password' => Hash::make('password123'),
-                ]);
-
-                if ($role) {
-                    $user->roles()->syncWithoutDetaching([$role->id => ['establishment_id' => $request->establishment_id]]);
+                $firstName = trim($row[0] ?? '');
+                $lastName = trim($row[1] ?? '');
+                $email = trim($row[2] ?? '');
+                $phone = trim($row[3] ?? '') ?: null;  // Optional
+                $address = trim($row[4] ?? '') ?: null;  // Optional
+                $specialty = trim($row[5] ?? '') ?: null; // Optional
+                
+                if (empty($firstName) || empty($lastName) || empty($email)) {
+                    $errors[] = "Ligne {$rowIndex}: Nom, prénom et email sont requis";
+                    continue;
                 }
-                $count++;
+
+                // Validate email format
+                if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $errors[] = "Ligne {$rowIndex}: Email '{$email}' invalide";
+                    continue;
+                }
+
+                // Check if email already exists
+                if (User::where('email', $email)->exists()) {
+                    $skipped++;
+                    $errors[] = "Ligne {$rowIndex}: Email '{$email}' existe déjà";
+                    continue;
+                }
+
+                try {
+                    $user = User::create([
+                        'name' => $lastName . ' ' . $firstName,
+                        'email' => $email,
+                        'phone' => $phone,
+                        'address' => $address,
+                        'establishment_id' => $request->establishment_id,
+                        'password' => Hash::make('password123'), // Default password
+                    ]);
+
+                    if ($role) {
+                        $user->roles()->syncWithoutDetaching([$role->id => ['establishment_id' => $request->establishment_id]]);
+                    }
+                    
+                    // Attach to academic year if available
+                    if ($academicYearId) {
+                        $user->academicYears()->syncWithoutDetaching([$academicYearId]);
+                    }
+                    
+                    // Log specialty if provided (could be stored in a separate table if needed)
+                    if ($specialty) {
+                        // For now, we could store it in user metadata or a separate specialties table
+                        // This is a placeholder for future enhancement
+                        // $user->specialty = $specialty;
+                    }
+                    
+                    $count++;
+                } catch (\Exception $e) {
+                    $errors[] = "Ligne {$rowIndex}: Erreur création utilisateur - " . $e->getMessage();
+                }
             }
 
-            return response()->json(['message' => "$count enseignants importés. $skipped ignorés (email existant)."]);
+            $responseMessage = "$count enseignants importés avec succès";
+            if ($skipped > 0) {
+                $responseMessage .= ", $skipped ignorés (email existant)";
+            }
+            if (!empty($errors)) {
+                $responseMessage .= ". " . count($errors) . " erreurs de validation.";
+            }
+
+            return response()->json([
+                'message' => $responseMessage,
+                'imported' => $count,
+                'skipped' => $skipped,
+                'errors' => $errors
+            ]);
+            
         } catch (\Exception $e) {
-             return response()->json(['message' => "Erreur import: " . $e->getMessage()], 500);
+            return response()->json([
+                'message' => "Erreur lors de l'import: " . $e->getMessage(),
+                'errors' => ['Erreur générale: ' . $e->getMessage()]
+            ], 500);
         }
     }
 }

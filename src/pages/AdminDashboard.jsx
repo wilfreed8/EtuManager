@@ -15,7 +15,10 @@ import {
     Plus,
     X,
     Trash2,
-    LayoutGrid
+    LayoutGrid,
+    Clock,
+    Monitor,
+    Eye
 } from 'lucide-react';
 import { Card, Button, Badge, Input, Select } from '../components/ui';
 import { DonutChart } from '../components/charts';
@@ -49,6 +52,8 @@ const AdminDashboard = ({ user }) => {
         priority: 'info',
         expires_at: '',
     });
+    const [auditLogs, setAuditLogs] = useState([]);
+    const [logsLoading, setLogsLoading] = useState(true);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -81,6 +86,20 @@ const AdminDashboard = ({ user }) => {
             }
         };
         fetchMessages();
+    }, []);
+
+    useEffect(() => {
+        const fetchAuditLogs = async () => {
+            try {
+                const response = await api.get('/audit-logs?limit=20');
+                setAuditLogs(response.data);
+            } catch (err) {
+                console.error("Error fetching audit logs:", err);
+            } finally {
+                setLogsLoading(false);
+            }
+        };
+        fetchAuditLogs();
     }, []);
 
     const handleCreateMessage = async () => {
@@ -215,56 +234,91 @@ const AdminDashboard = ({ user }) => {
                                     <Card.Title>Security Monitor</Card.Title>
                                     <Card.Description>Recent login activity and access logs</Card.Description>
                                 </div>
-                                <Button variant="ghost" size="sm">
+                                <Button variant="ghost" size="sm" icon={Eye}>
                                     View all logs
                                 </Button>
                             </div>
                         </Card.Header>
                         <Card.Content>
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            <th className="pb-3">User</th>
-                                            <th className="pb-3">Role</th>
-                                            <th className="pb-3">Timestamp</th>
-                                            <th className="pb-3">IP Address</th>
-                                            <th className="pb-3">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {recentLogins.map((login, idx) => (
-                                            <tr key={idx} className="text-sm">
-                                                <td className="py-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                                                            <span className="text-xs font-medium text-gray-600">
-                                                                {login.user.split(' ').map(n => n[0]).join('')}
-                                                            </span>
-                                                        </div>
-                                                        <span className="font-medium text-gray-900">{login.user}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="py-3 text-gray-600">{login.role}</td>
-                                                <td className="py-3 text-gray-600">{login.time}</td>
-                                                <td className="py-3 font-mono text-gray-600">{login.ip}</td>
-                                                <td className="py-3">
-                                                    <Badge
-                                                        variant={
-                                                            login.status === 'success' ? 'success' :
-                                                                login.status === 'failed' ? 'danger' : 'warning'
-                                                        }
-                                                        dot
-                                                    >
-                                                        {login.status === 'success' ? 'Success' :
-                                                            login.status === 'failed' ? 'Failed' : '2FA Required'}
-                                                    </Badge>
-                                                </td>
+                            {logsLoading ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                </div>
+                            ) : auditLogs.length === 0 ? (
+                                <div className="text-center py-8 text-gray-500">
+                                    <Monitor className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                                    <p>Aucune activité récente</p>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <th className="pb-3">User</th>
+                                                <th className="pb-3">Action</th>
+                                                <th className="pb-3">Timestamp</th>
+                                                <th className="pb-3">IP Address</th>
+                                                <th className="pb-3">Status</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {auditLogs.map((log, idx) => (
+                                                <tr key={log.id || idx} className="text-sm">
+                                                    <td className="py-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                                                                <span className="text-xs font-medium text-gray-600">
+                                                                    {log.user ? log.user.name.split(' ').map(n => n[0]).join('') : '?'}
+                                                                </span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="font-medium text-gray-900">
+                                                                    {log.user ? log.user.name : 'Unknown'}
+                                                                </span>
+                                                                <div className="text-xs text-gray-500">{log.user?.role}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-3">
+                                                        <Badge
+                                                            variant={
+                                                                log.action === 'login' ? 'success' :
+                                                                log.action === 'logout' ? 'warning' :
+                                                                log.action === 'delete' ? 'danger' :
+                                                                'info'
+                                                            }
+                                                            size="sm"
+                                                        >
+                                                            {log.action}
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="py-3 text-gray-600">
+                                                        {new Date(log.created_at).toLocaleString('fr-FR', {
+                                                            day: 'numeric',
+                                                            month: 'short',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        })}
+                                                    </td>
+                                                    <td className="py-3 font-mono text-gray-600">{log.ip_address}</td>
+                                                    <td className="py-3">
+                                                        <Badge
+                                                            variant={
+                                                                log.status === 'success' ? 'success' :
+                                                                log.status === 'failed' ? 'danger' : 'warning'
+                                                            }
+                                                            dot
+                                                        >
+                                                            {log.status === 'success' ? 'Success' :
+                                                             log.status === 'failed' ? 'Failed' : 'Warning'}
+                                                        </Badge>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </Card.Content>
                     </Card>
                 </motion.div>

@@ -50,67 +50,64 @@ class BulletinController extends Controller
      * Generate bulletins for all students in a class (ZIP download)
      */
     public function generateClassBulletins(Request $request, $classId, $periodId)
-    {
-        $period = Period::findOrFail($periodId);
-        $schoolClass = SchoolClass::findOrFail($classId);
-        
-        // Get all students enrolled in this class
-        $enrollments = StudentEnrollment::where('class_id', $classId)
-            ->where('academic_year_id', $period->academic_year_id)
-            ->with('student')
-            ->get();
+{
+    $period = Period::findOrFail($periodId);
+    $schoolClass = SchoolClass::findOrFail($classId);
 
-        if ($enrollments->isEmpty()) {
-            return response()->json(['error' => 'No students found in this class'], 404);
-        }
+    $enrollments = StudentEnrollment::where('class_id', $classId)
+        ->where('academic_year_id', $period->academic_year_id)
+        ->with('student.establishment')
+        ->get();
 
-        $format = $request->query('format', 'html'); // 'html', 'pdf'
-        $zipFileName = 'Bulletins_' . $schoolClass->name . '_' . now()->timestamp . '.zip';
-        $zipPath = storage_path('app/public/' . $zipFileName);
-
-        $zip = new ZipArchive;
-        if ($zip->open($zipPath, ZipArchive::CREATE) === TRUE) {
-            foreach ($enrollments as $enrollment) {
-                try {
-                    $student = $enrollment->student;
-                    $data = $this->prepareBulletinData($student, $period);
-                    
-                    if (isset($data['error'])) {
-                        \Illuminate\Support\Facades\Log::warning("Bulletin data error for student {$student->id}: " . $data['error']);
-                        continue;
-                    }
-
-                    $filenameBase = str_replace(' ', '_', $student->last_name . '_' . $student->first_name);
-                    $template = $student->establishment->bulletin_template ?? 'template1';
-                    $viewName = 'bulletins.' . $template;
-                    
-                    if (!view()->exists($viewName)) {
-                        \Illuminate\Support\Facades\Log::warning("View $viewName not found, falling back to template1");
-                        $viewName = 'bulletins.template1';
-                    }
-
-                    if ($format === 'pdf') {
-                        // Ensure DOMPDF is loaded
-                         $pdf = app('dompdf.wrapper');
-                         $pdf->loadView($viewName, $data);
-                         $pdf->setPaper('a4', 'portrait');
-                         $zip->addFromString($filenameBase . '.pdf', $pdf->output());
-                    } else {
-                        $html = view($viewName, $data)->render();
-                        $zip->addFromString($filenameBase . '.html', $html);
-                    }
-                } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error("Error generating bulletin for user {$enrollment->student_id}: " . $e->getMessage() . "\n" . $e->getTraceAsString());
-                    continue; // Skip this student but continue others
-                }
-            }
-            $zip->close();
-        } else {
-            return response()->json(['error' => 'Could not create ZIP archive'], 500);
-        }
-
-        return response()->download($zipPath)->deleteFileAfterSend(true);
+    if ($enrollments->isEmpty()) {
+        return response()->json(['error' => 'No students found'], 404);
     }
+
+    $format = $request->query('format', 'pdf');
+    $studentCount = $enrollments->count();
+    $className = str_replace(' ', '_', $schoolClass->name);
+    $zipFileName = "Bulletins_{$className}_{$studentCount}etudiants_" . time() . '.zip';
+    $zipPath = storage_path('app/public/' . $zipFileName);
+
+    $zip = new ZipArchive;
+    if ($zip->open($zipPath, ZipArchive::CREATE) === TRUE) {
+        foreach ($enrollments as $enrollment) {
+            try {
+                $student = $enrollment->student;
+                $data = $this->prepareBulletinData($student, $period);
+
+                if (isset($data['error'])) {
+                    continue;
+                }
+
+                $filename = str_replace(' ', '_', $student->last_name . '_' . $student->first_name);
+                $template = $student->establishment->bulletin_template ?? 'template1';
+                $viewName = view()->exists("bulletins.$template") ? "bulletins.$template" : "bulletins.template1";
+
+                if ($format === 'pdf') {
+                    $pdf = app('dompdf.wrapper');
+                    $pdf->loadView($viewName, $data);
+                    $content = $pdf->output();
+
+                    if (!empty($content)) {
+                        $zip->addFromString($filename . '.pdf', $content);
+                    }
+                } else {
+                    $html = view($viewName, $data)->render();
+                    if (!empty($html)) {
+                        $zip->addFromString($filename . '.html', $html);
+                    }
+                }
+
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+        $zip->close();
+    }
+
+    return response()->download($zipPath)->deleteFileAfterSend(true);
+}
 
     /**
      * Prepare all data needed for a student's bulletin
@@ -134,12 +131,11 @@ class BulletinController extends Controller
             ->with(['subject', 'subject.teacherAssignments.teacher'])
             ->get();
 
-        // Group subjects by category
-        $subjectsByCategory = $this->groupSubjectsByCategory($grades);
-        
-        // Calculate report data
         // Calculate report data
         $report = $this->calculateReport($grades, $class->id);
+
+        // Group report rows by category
+        $subjectsByCategory = $report->groupBy('category');
         
         // Get class statistics
         $classStats = $this->calculateClassStats($class->id, $period->id);
@@ -241,8 +237,10 @@ class BulletinController extends Controller
             }
             
             return [
+                'subject_id' => $grade->subject->id ?? null,
                 'subject' => $grade->subject->name ?? 'N/A',
                 'subject_code' => $grade->subject->code ?? '',
+                'category' => $grade->subject->category ?? 'AUTRES MATIERES',
                 'coefficient' => $coeff,
                 'interro' => $grade->interro_avg,
                 'devoir' => $grade->devoir_avg,

@@ -36,6 +36,10 @@ const PlatformSettings = () => {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [selectedSetting, setSelectedSetting] = useState(null);
+    const [saving, setSaving] = useState(false);
+    const [deletingSettingId, setDeletingSettingId] = useState(null);
+    const [backingUp, setBackingUp] = useState(false);
+    const [restoring, setRestoring] = useState(false);
     const [formData, setFormData] = useState({
         key: '',
         value: '',
@@ -63,6 +67,7 @@ const PlatformSettings = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setSaving(true);
         try {
             if (selectedSetting) {
                 await api.put(`/super-admin/settings/${selectedSetting.id}`, formData);
@@ -76,6 +81,8 @@ const PlatformSettings = () => {
             resetForm();
         } catch (error) {
             toast.error('Erreur lors de l\'opération');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -93,12 +100,15 @@ const PlatformSettings = () => {
 
     const handleDelete = async (settingId) => {
         if (confirm('Êtes-vous sûr de vouloir supprimer ce paramètre ?')) {
+            setDeletingSettingId(settingId);
             try {
                 await api.delete(`/super-admin/settings/${settingId}`);
                 toast.success('Paramètre supprimé avec succès');
                 fetchSettings();
             } catch (error) {
                 toast.error('Erreur lors de la suppression');
+            } finally {
+                setDeletingSettingId(null);
             }
         }
     };
@@ -115,6 +125,7 @@ const PlatformSettings = () => {
     };
 
     const handleBackup = async () => {
+        setBackingUp(true);
         try {
             const response = await api.post('/super-admin/backup');
             toast.success('Sauvegarde créée avec succès');
@@ -125,6 +136,8 @@ const PlatformSettings = () => {
             link.click();
         } catch (error) {
             toast.error('Erreur lors de la création de la sauvegarde');
+        } finally {
+            setBackingUp(false);
         }
     };
 
@@ -135,6 +148,7 @@ const PlatformSettings = () => {
         const formData = new FormData();
         formData.append('backup_file', file);
 
+        setRestoring(true);
         try {
             await api.post('/super-admin/restore', formData, {
                 headers: {
@@ -147,6 +161,8 @@ const PlatformSettings = () => {
             }, 2000);
         } catch (error) {
             toast.error('Erreur lors de la restauration');
+        } finally {
+            setRestoring(false);
         }
     };
 
@@ -199,6 +215,8 @@ const PlatformSettings = () => {
                             icon={Download}
                             variant="outline"
                             className="w-full"
+                            loading={backingUp}
+                            disabled={backingUp || restoring || saving}
                         >
                             Sauvegarder
                         </Button>
@@ -207,6 +225,8 @@ const PlatformSettings = () => {
                                 icon={Upload}
                                 variant="outline"
                                 className="w-full cursor-pointer"
+                                loading={restoring}
+                                disabled={backingUp || restoring || saving}
                             >
                                 Restaurer
                             </Button>
@@ -215,6 +235,7 @@ const PlatformSettings = () => {
                                 accept=".sql,.zip"
                                 onChange={handleRestore}
                                 className="hidden"
+                                disabled={backingUp || restoring || saving}
                             />
                         </label>
                         <Button
@@ -251,6 +272,7 @@ const PlatformSettings = () => {
                                 }}
                                 icon={Plus}
                                 size="sm"
+                                disabled={saving || deletingSettingId !== null}
                             >
                                 Ajouter
                             </Button>
@@ -275,6 +297,7 @@ const PlatformSettings = () => {
                                             size="sm"
                                             onClick={() => handleEdit(setting)}
                                             icon={Edit}
+                                            disabled={saving || deletingSettingId === setting.id}
                                         >
                                             Modifier
                                         </Button>
@@ -283,6 +306,8 @@ const PlatformSettings = () => {
                                             size="sm"
                                             onClick={() => handleDelete(setting.id)}
                                             icon={Trash2}
+                                            loading={deletingSettingId === setting.id}
+                                            disabled={saving || deletingSettingId === setting.id}
                                         >
                                             Supprimer
                                         </Button>
@@ -305,6 +330,7 @@ const PlatformSettings = () => {
                                 }}
                                 icon={Plus}
                                 size="sm"
+                                disabled={saving || deletingSettingId !== null}
                             >
                                 Ajouter
                             </Button>
@@ -329,6 +355,7 @@ const PlatformSettings = () => {
                                             size="sm"
                                             onClick={() => handleEdit(setting)}
                                             icon={Edit}
+                                            disabled={saving || deletingSettingId === setting.id}
                                         >
                                             Modifier
                                         </Button>
@@ -337,6 +364,8 @@ const PlatformSettings = () => {
                                             size="sm"
                                             onClick={() => handleDelete(setting.id)}
                                             icon={Trash2}
+                                            loading={deletingSettingId === setting.id}
+                                            disabled={saving || deletingSettingId === setting.id}
                                         >
                                             Supprimer
                                         </Button>
@@ -429,13 +458,15 @@ const PlatformSettings = () => {
                                 resetForm();
                             }}
                             className="flex-1"
+                            disabled={saving}
                         >
                             Annuler
                         </Button>
                         <Button
                             type="submit"
                             className="flex-1"
-                            disabled={!formData.key || !formData.value}
+                            loading={saving}
+                            disabled={saving || !formData.key || !formData.value}
                         >
                             {selectedSetting ? 'Mettre à jour' : 'Créer'}
                         </Button>

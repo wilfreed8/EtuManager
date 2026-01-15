@@ -37,6 +37,9 @@ const UsersManagement = () => {
     const [roleFilter, setRoleFilter] = useState('all');
     const [showModal, setShowModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
+    const [saving, setSaving] = useState(false);
+    const [deletingUserId, setDeletingUserId] = useState(null);
+    const [togglingUserId, setTogglingUserId] = useState(null);
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -79,6 +82,7 @@ const UsersManagement = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setSaving(true);
         try {
             const submitData = selectedUser 
                 ? { ...formData, _method: 'PUT' }
@@ -96,6 +100,8 @@ const UsersManagement = () => {
             resetForm();
         } catch (error) {
             toast.error('Erreur lors de l\'opération');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -115,23 +121,29 @@ const UsersManagement = () => {
 
     const handleDelete = async (userId) => {
         if (confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
+            setDeletingUserId(userId);
             try {
                 await api.delete(`/super-admin/users/${userId}`);
                 toast.success('Utilisateur supprimé avec succès');
                 fetchUsers();
             } catch (error) {
                 toast.error('Erreur lors de la suppression');
+            } finally {
+                setDeletingUserId(null);
             }
         }
     };
 
     const handleToggleStatus = async (user) => {
+        setTogglingUserId(user?.id);
         try {
             await api.put(`/super-admin/users/${user?.id}/toggle-status`);
             toast.success(`Utilisateur ${user?.is_active ? 'désactivé' : 'activé'} avec succès`);
             fetchUsers();
         } catch (error) {
             toast.error('Erreur lors du changement de statut');
+        } finally {
+            setTogglingUserId(null);
         }
     };
 
@@ -310,6 +322,7 @@ const UsersManagement = () => {
                                                 size="sm"
                                                 onClick={() => handleEdit(user)}
                                                 icon={Edit}
+                                                disabled={saving || deletingUserId === user?.id || togglingUserId === user?.id}
                                             >
                                                 Modifier
                                             </Button>
@@ -318,6 +331,8 @@ const UsersManagement = () => {
                                                 size="sm"
                                                 onClick={() => handleToggleStatus(user)}
                                                 icon={StatusIcon}
+                                                loading={togglingUserId === user?.id}
+                                                disabled={saving || deletingUserId === user?.id || togglingUserId === user?.id}
                                             >
                                                 {isActive ? 'Désactiver' : 'Activer'}
                                             </Button>
@@ -326,6 +341,8 @@ const UsersManagement = () => {
                                                 size="sm"
                                                 onClick={() => handleDelete(user.id)}
                                                 icon={Trash2}
+                                                loading={deletingUserId === user?.id}
+                                                disabled={saving || deletingUserId === user?.id || togglingUserId === user?.id}
                                             >
                                                 Supprimer
                                             </Button>
@@ -443,13 +460,15 @@ const UsersManagement = () => {
                                 resetForm();
                             }}
                             className="flex-1"
+                            disabled={saving}
                         >
                             Annuler
                         </Button>
                         <Button
                             type="submit"
                             className="flex-1"
-                            disabled={!formData.name || !formData.email}
+                            loading={saving}
+                            disabled={saving || !formData.name || !formData.email}
                         >
                             {selectedUser ? 'Mettre à jour' : 'Créer'}
                         </Button>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Input, Select, Badge } from '../components/ui';
-import { Settings, Plus, Save, BookOpen, AlertCircle, FileUp, Filter } from 'lucide-react';
+import { Settings, Plus, Save, BookOpen, AlertCircle, FileUp, Filter, Trash2 } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from 'react-hot-toast';
 import ImportModal from '../components/ImportModal';
@@ -14,6 +14,7 @@ const SubjectManagement = ({ user }) => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [deletingSubjectId, setDeletingSubjectId] = useState(null);
 
     // New Subject Form
     const [newSubject, setNewSubject] = useState({ name: '', code: '', category: '', default_coefficient: 1 });
@@ -101,6 +102,52 @@ const SubjectManagement = ({ user }) => {
         }
     };
 
+    const handleDeleteSubject = async (subjectId) => {
+        const confirmed = await new Promise((resolve) => {
+            toast((t) => (
+                <div className="flex items-center gap-4">
+                    <span>Êtes-vous sûr de vouloir supprimer cette matière pour l'année académique sélectionnée ?</span>
+                    <button
+                        onClick={() => {
+                            toast.dismiss(t.id);
+                            resolve(true);
+                        }}
+                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                    >
+                        Oui
+                    </button>
+                    <button
+                        onClick={() => {
+                            toast.dismiss(t.id);
+                            resolve(false);
+                        }}
+                        className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
+                    >
+                        Non
+                    </button>
+                </div>
+            ), {
+                duration: Infinity,
+            });
+        });
+        
+        if (!confirmed) return;
+        
+        setDeletingSubjectId(subjectId);
+        try {
+            const response = await api.delete(`/subjects/${subjectId}?academic_year_id=${academicYearId}`);
+            console.log('Delete response:', response);
+            toast.success('Matière supprimée pour cette année');
+            fetchData();
+        } catch (error) {
+            console.error('Delete error:', error);
+            console.error('Error response:', error.response);
+            toast.error(error.response?.data?.message || 'Erreur lors de la suppression');
+        } finally {
+            setDeletingSubjectId(null);
+        }
+    };
+
     const handleSaveConfig = async () => {
         setSaving(true);
         try {
@@ -184,7 +231,16 @@ const SubjectManagement = ({ user }) => {
                                             <td className="px-6 py-4 text-gray-500">{sub.category || '-'}</td>
                                             <td className="px-6 py-4">{sub.coefficient}</td>
                                             <td className="px-6 py-4">
-                                                <button className="text-blue-600 hover:underline">Modifier</button>
+                                                <Button
+                                                    variant="danger"
+                                                    size="sm"
+                                                    icon={Trash2}
+                                                    loading={deletingSubjectId === sub.id}
+                                                    disabled={deletingSubjectId === sub.id}
+                                                    onClick={() => handleDeleteSubject(sub.id)}
+                                                >
+                                                    Supprimer
+                                                </Button>
                                             </td>
                                         </tr>
                                     ))}

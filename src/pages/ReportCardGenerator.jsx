@@ -19,7 +19,10 @@ const ReportCardGenerator = ({ user }) => {
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
     const [downloadingBulk, setDownloadingBulk] = useState(false);
+    const [downloadingIndividuals, setDownloadingIndividuals] = useState({});
     const [downloadFormat, setDownloadFormat] = useState('pdf'); // 'pdf' or 'docx' or 'html'
+
+    const isAnyIndividualDownloading = Object.values(downloadingIndividuals).some(Boolean);
 
     // Fetch classes and active period
     useEffect(() => {
@@ -97,6 +100,8 @@ const ReportCardGenerator = ({ user }) => {
             return;
         }
 
+        setDownloadingIndividuals((prev) => ({ ...prev, [studentId]: true }));
+
         try {
             const toastId = toast.loading("Génération du bulletin...");
             const response = await api.get(`/bulletins/${studentId}/${selectedPeriod}`, {
@@ -117,8 +122,10 @@ const ReportCardGenerator = ({ user }) => {
 
         } catch (error) {
             console.error(error);
-            toast.dismiss();
+            toast.dismiss(toastId);
             toast.error("Erreur génération bulletin");
+        } finally {
+            setDownloadingIndividuals((prev) => ({ ...prev, [studentId]: false }));
         }
     };
 
@@ -129,34 +136,72 @@ const ReportCardGenerator = ({ user }) => {
         }
 
         setDownloadingBulk(true);
-        const toastId = toast.loading("Préparation de l'archive ZIP...");
+        const toastId = toast.loading("Préparation du téléchargement...");
 
         try {
-            // We request a ZIP blob directly
-            const response = await api.get(`/bulletins/class/${selectedClass}/period/${selectedPeriod}`, {
-                params: {
-                    format: downloadFormat
-                },
-                responseType: 'blob'
+            // Create direct download link instead of blob
+            const token = localStorage.getItem('token');
+            const baseUrl = api.defaults.baseURL || 'http://127.0.0.1:8000/api';
+            const downloadUrl = `${baseUrl}/bulletins/class/${selectedClass}/period/${selectedPeriod}?format=${downloadFormat}`;
+            
+            // Use fetch for authenticated download
+            const response = await fetch(downloadUrl, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/octet-stream'
+                }
             });
 
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            // Get the blob from response
+            const blob = await response.blob();
+            
+            // Check if it's actually an error (JSON disguised as blob)
+            if (blob.type === 'application/json') {
+                const text = await blob.text();
+                const errorData = JSON.parse(text);
+                throw new Error(errorData.error || 'Erreur serveur');
+            }
+
             // Create download link
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
+            const url = window.URL.createObjectURL(blob);
+            const downloadLink = document.createElement('a');
+            downloadLink.href = url;
             const className = classes.find(c => c.id === selectedClass)?.name || 'Classe';
-            link.setAttribute('download', `Bulletins_${className}.zip`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
+            downloadLink.setAttribute('download', `Bulletins_${className}.zip`);
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            downloadLink.remove();
+            window.URL.revokeObjectURL(url);
 
             toast.dismiss(toastId);
-            toast.success("Téléchargement lancé");
+            toast.success("Téléchargement terminé");
         } catch (err) {
-            console.error(err);
+            console.error('=== ZIP DOWNLOAD ERROR ===');
+            console.error('Error message:', err.message);
+            console.error('Full error:', err);
+            
             toast.dismiss(toastId);
-            toast.error("Erreur lors du téléchargement");
+            
+            // Handle specific error messages
+            if (err.message?.includes('No students found')) {
+                toast.error("Aucun étudiant trouvé dans cette classe");
+            } else if (err.message?.includes('No bulletins could be generated')) {
+                toast.error("Impossible de générer les bulletins");
+            } else if (err.message?.includes('Could not create ZIP archive')) {
+                toast.error("Erreur de création du fichier ZIP");
+            } else if (err.message?.includes('HTTP 404')) {
+                toast.error("Classe ou période non trouvée");
+            } else if (err.message?.includes('HTTP 500')) {
+                toast.error("Erreur serveur lors de la génération");
+            } else {
+                toast.error("Erreur lors du téléchargement: " + (err.message || 'Erreur inconnue'));
+            }
         } finally {
+            // Always set loading to false
             setDownloadingBulk(false);
         }
     };
@@ -184,7 +229,7 @@ const ReportCardGenerator = ({ user }) => {
                         variant="outline"
                         icon={FileDown}
                         loading={downloadingBulk}
-                        disabled={downloadingBulk || students.length === 0}
+                        disabled={downloadingBulk || students.length === 0 || isAnyIndividualDownloading}
                         onClick={handleDownloadBulk}
                     >
                         Télécharger Tout
@@ -272,7 +317,8 @@ const ReportCardGenerator = ({ user }) => {
                                                     size="sm"
                                                     icon={Download}
                                                     onClick={() => handleDownloadIndividual(student.id)}
-                                                    disabled={downloadingBulk}
+                                                    loading={!!downloadingIndividuals[student.id]}
+                                                    disabled={downloadingBulk || !!downloadingIndividuals[student.id]}
                                                 >
                                                     Télécharger
                                                 </Button>
